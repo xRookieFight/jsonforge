@@ -64,8 +64,7 @@
         "ext": "jfproject",
         "name": "JsonForge Project",
         "description": "JsonForge bundled UI project",
-        "role": "Editor",
-        "icon": "build/icons/win/icon.ico"
+        "role": "Editor"
       }
     ],
     "win": {

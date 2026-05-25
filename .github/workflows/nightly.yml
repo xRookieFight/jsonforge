@@ -1,9 +1,8 @@
 name: Nightly
 
 on:
-  schedule:
-    - cron: "0 3 * * *"
-  workflow_dispatch:
+  push:
+    branches: [master]
 
 concurrency:
   group: nightly

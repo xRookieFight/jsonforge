@@ -35,15 +35,4 @@ jobs:
           echo "JF_VERSION=${NEW}" >> $GITHUB_ENV
       - run: npm run build
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
-      - run: npx electron-builder --publish=never
-      - uses: actions/upload-artifact@v4
-        with:
-          name: jsonforge-nightly-${{ matrix.os }}-${{ env.JF_VERSION }}
-          path: |
-            installer/*.exe
-            installer/*.dmg
-            installer/*.AppImage
-            installer/*.deb
-            installer/*.zip
-          retention-days: 14
+          NODE_OPTIONS: --max-old-space-size=4096  

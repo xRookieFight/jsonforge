@@ -40,36 +40,3 @@ jobs:
           name: web-dist
           path: dist
           retention-days: 7
-
-  build-electron:
-    name: Electron Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    needs: lint-and-typecheck
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-      - name: Build Electron bundle (no publish)
-        run: npx electron-builder --publish=never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: installer-${{ matrix.os }}
-          path: |
-            installer/*.exe
-            installer/*.dmg
-            installer/*.AppImage
-            installer/*.deb
-            installer/*.zip
-          retention-days: 7

@@ -1,0 +1,35 @@
+node_modules
+dist
+dist-electron
+installer/**
+!installer/.gitkeep
+!installer/README.md
+release
+.vite
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+.idea
+.claude
+.vscode/*
+!.vscode/extensions.json
+*.tsbuildinfo
+coverage
+.nyc_output
+.cache
+.parcel-cache
+
+# Local user icons (replace with placeholder kept in repo)
+build/icons/icon.ico
+build/icons/icon.icns
+build/icons/icon.png
+build/icons/*.bmp
+build/icons/dmg-background.png
+!build/icons/icon.svg
+!build/icons/README.md
+
+# Test outputs
+test-results
+playwright-report

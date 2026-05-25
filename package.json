@@ -1,0 +1,118 @@
+{
+  "name": "jsonforge",
+  "version": "0.1.0",
+  "description": "Visual JSON UI editor for Minecraft: Bedrock Edition.",
+  "author": "JsonForge Developer Team",
+  "license": "MIT",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "vite --mode electron",
+    "build": "tsc -b && vite build",
+    "build:electron": "tsc -b && vite build --mode electron && electron-builder",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.6.0",
+    "immer": "^10.1.1",
+    "lucide-react": "^0.428.0",
+    "monaco-editor": "^0.50.0",
+    "nanoid": "^5.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-mosaic-component": "^6.1.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.2.1",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3",
+    "vite-plugin-electron": "^0.28.7",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "build": {
+    "appId": "com.jsonforge.jsonforge",
+    "productName": "JsonForge",
+    "copyright": "Copyright (C) 2026 JsonForge Developer Team",
+    "directories": {
+      "output": "installer",
+      "buildResources": "build"
+    },
+    "asar": true,
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icons",
+        "to": "icons",
+        "filter": ["**/*"]
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "jfproject",
+        "name": "JsonForge Project",
+        "description": "JsonForge bundled UI project",
+        "role": "Editor",
+        "icon": "build/icons/win/icon"
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icons/win/icon.ico",
+      "publisherName": "JsonForge"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "JsonForge",
+      "menuCategory": "JsonForge",
+      "uninstallDisplayName": "JsonForge ${version}",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icons/win/icon.ico",
+      "uninstallerIcon": "build/icons/win/icon.ico",
+      "license": "LICENSE"
+    },
+    "portable": {
+      "artifactName": "JsonForge-${version}-portable.exe"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "build/icons/mac/icon.icns",
+      "category": "public.app-category.developer-tools"
+    },
+    "dmg": {
+      "icon": "build/icons/mac/icon.icns"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icons/png/64x64.png",
+      "category": "Development",
+      "synopsis": "Visual editor for Minecraft Bedrock JSON UI",
+      "description": "JSON UI editor for Minecraft Bedrock Edition."
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "JsonForge",
+      "repo": "jsonforge"
+    }
+  }
+}

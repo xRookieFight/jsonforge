@@ -1,0 +1,81 @@
+name: Bug report
+description: Something is wrong or unexpected in JsonForge
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill out the sections below so we can
+        reproduce and fix the issue quickly.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One sentence describing the bug.
+      placeholder: Image elements show "missing texture" stripes even after the texture is uploaded.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Numbered steps to reproduce the behavior.
+      placeholder: |
+        1. Open Welcome → New → Blank Form
+        2. Upload texture "hotbar_slot.png" in Textures panel
+        3. Add an Image element, set texture name to "hotbar_slot"
+        4. Image stays empty
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Build
+      options:
+        - Web (browser)
+        - Electron (desktop)
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: JsonForge version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS + version
+      placeholder: "Windows 11 23H2 / macOS 14.4 / Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Logs, screenshots, .jfproject snippet
+      description: |
+        Attach the smallest `.jfproject` (or JSON UI excerpt) that reproduces
+        the issue. For Electron crashes paste the console output.

@@ -1,0 +1,50 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Nightly Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Stamp nightly version
+        shell: bash
+        run: |
+          STAMP=$(date -u +"%Y%m%d%H%M")
+          BASE=$(node -p "require('./package.json').version")
+          NEW="${BASE}-nightly.${STAMP}"
+          node -e "const fs=require('fs');const p=require('./package.json');p.version='${NEW}';fs.writeFileSync('package.json',JSON.stringify(p,null,2));"
+          echo "JF_VERSION=${NEW}" >> $GITHUB_ENV
+      - run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - run: npx electron-builder --publish=never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jsonforge-nightly-${{ matrix.os }}-${{ env.JF_VERSION }}
+          path: |
+            installer/*.exe
+            installer/*.dmg
+            installer/*.AppImage
+            installer/*.deb
+            installer/*.zip
+          retention-days: 14

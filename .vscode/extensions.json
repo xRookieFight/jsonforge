@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "editorconfig.editorconfig",
+    "yoavbls.pretty-ts-errors",
+    "redhat.vscode-yaml",
+    "ms-vscode.vscode-typescript-next"
+  ]
+}

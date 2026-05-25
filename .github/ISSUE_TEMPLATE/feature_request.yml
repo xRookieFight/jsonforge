@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an enhancement or new capability
+title: "[feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve? Why does the current behavior fall short?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like JsonForge to behave? Mockups welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about and why you rejected them.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - UI / UX polish
+        - New element type
+        - New property type
+        - JSON UI export / import
+        - Electron / installer
+        - Bindings / scripter
+        - Other
+    validations:
+      required: true

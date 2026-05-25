@@ -1,0 +1,34 @@
+* text=auto eol=lf
+
+*.bat        text eol=crlf
+*.cmd        text eol=crlf
+*.ps1        text eol=crlf
+
+*.ts         linguist-language=TypeScript
+*.tsx        linguist-language=TypeScript
+
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.gif        binary
+*.ico        binary
+*.icns       binary
+*.bmp        binary
+*.webp       binary
+*.ttf        binary
+*.otf        binary
+*.woff       binary
+*.woff2      binary
+*.zip        binary
+*.exe        binary
+*.dll        binary
+*.dmg        binary
+*.AppImage   binary
+*.deb        binary
+
+# Exclude generated + bundled output from GitHub language stats
+dist/**            linguist-generated=true
+dist-electron/**   linguist-generated=true
+installer/**       linguist-generated=true
+node_modules/**    linguist-vendored=true
+package-lock.json  linguist-generated=true

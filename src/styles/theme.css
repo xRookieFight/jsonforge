@@ -1,0 +1,24 @@
+:root {
+  --jf-bg-0: #131418;
+  --jf-bg-1: #1a1c21;
+  --jf-bg-2: #20232a;
+  --jf-bg-3: #272a32;
+  --jf-bg-elev: #2b2e38;
+  --jf-border: #34373f;
+  --jf-border-strong: #4a4f5c;
+  --jf-text: #e3e5ea;
+  --jf-text-dim: #9aa0aa;
+  --jf-text-faint: #6e7280;
+  --jf-accent: #f6c453;
+  --jf-accent-strong: #ffd470;
+  --jf-success: #62d28a;
+  --jf-danger: #f0676b;
+  --jf-info: #6cb7f2;
+  --jf-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  --jf-radius-sm: 3px;
+  --jf-radius: 5px;
+  --jf-radius-lg: 8px;
+  --jf-font: "Inter", "Segoe UI", system-ui, sans-serif;
+  --jf-font-mono: "JetBrains Mono", "Consolas", monospace;
+  --jf-font-size: 12px;
+}

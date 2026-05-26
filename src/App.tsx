@@ -132,30 +132,65 @@ export function App() {
     const api = window.jsonforge;
     if (!api?.discord) return;
     const project = Container.resolve<ProjectService>(ProjectService.NAME);
-    const push = () => {
+    let lastSig = "";
+    let dirtyTimer: ReturnType<typeof setTimeout> | null = null;
+    const sendActivity = () => {
       if (!project.hasProject()) {
-        void api.discord.setIdle();
+        console.log("[discord] sendActivity skipped: no project");
         return;
       }
       const meta = project.getMeta();
       const root = project.getRoot();
       const count = countElements(root);
-      void api.discord.setActivity({
+      const sig = `act|${meta.id}|${meta.name}|${meta.namespace}|${count}`;
+      if (sig === lastSig) return;
+      lastSig = sig;
+      const payload = {
         details: `Editing ${meta.name}`,
         state: `${count} element${count === 1 ? "" : "s"} · ${meta.namespace}`,
         startTimestamp: meta.createdAt
-      });
+      };
+      console.log("[discord] -> activity", payload);
+      void api.discord.setActivity(payload);
     };
-    push();
-    const offChanged = project.bus.on("project:changed", push);
-    const offDirty = project.bus.on("project:tree-changed", push);
-    const offClosed = project.bus.on("project:closed", push);
+    const sendIdle = () => {
+      const sig = "idle";
+      if (sig === lastSig) return;
+      lastSig = sig;
+      console.log("[discord] -> idle");
+      void api.discord.setIdle();
+    };
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    const forceResend = () => {
+      lastSig = "";
+      if (project.hasProject()) sendActivity();
+      else sendIdle();
+    };
+    if (project.hasProject()) sendActivity();
+    else sendIdle();
+    retry = setTimeout(forceResend, 3000);
+    const offChanged = project.bus.on("project:changed", () => {
+      console.log("[discord] project:changed event received");
+      if (retry) { clearTimeout(retry); retry = null; }
+      sendActivity();
+      retry = setTimeout(forceResend, 3000);
+    });
+    const offClosed = project.bus.on("project:closed", () => {
+      if (retry) { clearTimeout(retry); retry = null; }
+      sendIdle();
+    });
+    const offDirty = project.bus.on("project:tree-changed", () => {
+      if (dirtyTimer) clearTimeout(dirtyTimer);
+      dirtyTimer = setTimeout(sendActivity, 1000);
+    });
     return () => {
+      if (dirtyTimer) clearTimeout(dirtyTimer);
+      if (retry) clearTimeout(retry);
       offChanged();
       offDirty();
       offClosed();
     };
-  }, [hasProject]);
+  }, []);
 
   useEffect(() => {
     const api = window.jsonforge;

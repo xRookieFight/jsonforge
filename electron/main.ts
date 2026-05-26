@@ -48,7 +48,7 @@ class WindowManager {
       title: "JsonForge",
       icon: this.iconPath(),
       webPreferences: {
-        preload: join(__dirname, "preload.js"),
+        preload: join(__dirname, "preload.cjs"),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: false

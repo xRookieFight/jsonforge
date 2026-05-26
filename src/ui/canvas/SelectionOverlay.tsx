@@ -205,6 +205,24 @@ export function SelectionOverlay({ rootBox }: Props) {
         className="jf-selection__move"
         style={{ position: "absolute", inset: 0, pointerEvents: "auto", cursor: "move" }}
         onMouseDown={startMove}
+        onDragOver={e => {
+          if (node.typeId === "image" && e.dataTransfer.types.includes("application/jsonforge-texture")) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDrop={e => {
+          if (node.typeId !== "image") return;
+          const name = e.dataTransfer.getData("application/jsonforge-texture");
+          if (!name) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const prev = node.properties["texture"];
+          commitPropertyBatch(
+            [{ elementId: node.id, key: "texture", prev, next: name }],
+            "Set Texture"
+          );
+        }}
       />
       {HANDLES.map(handle => (
         <div

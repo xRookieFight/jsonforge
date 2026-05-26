@@ -20,12 +20,25 @@ export class DiscordRpcManager {
     if (!DISCORD_CLIENT_ID) return;
     if (this.client) return;
     try {
-      const RPC = await import("discord-rpc");
-      this.client = new RPC.Client({ transport: "ipc" });
+      const mod = await import("discord-rpc");
+      const RPC = (mod as unknown as { Client?: typeof import("discord-rpc").Client; default?: { Client: typeof import("discord-rpc").Client } });
+      const ClientCtor = RPC.Client ?? RPC.default?.Client;
+      if (!ClientCtor) {
+        console.warn("[discord-rpc] Client constructor missing from module:", Object.keys(mod));
+        return;
+      }
+      this.client = new ClientCtor({ transport: "ipc" });
+      console.log("[discord-rpc] client created, logging in...");
       this.client.on("ready", () => {
         this.ready = true;
-        if (this.pending) this.setActivity(this.pending);
-        else this.setIdle();
+        console.log("[discord-rpc] ready");
+        if (this.pending) {
+          const queued = this.pending;
+          this.pending = null;
+          this.setActivity(queued);
+        } else {
+          this.setIdle();
+        }
       });
       await this.client.login({ clientId: DISCORD_CLIENT_ID });
     } catch (err) {
@@ -70,6 +83,7 @@ export class DiscordRpcManager {
       const smallText = activity.smallImageText ?? DISCORD_RPC_DEFAULTS.smallImageText;
       if (smallText) payload.smallImageText = smallText;
     }
+    console.log("[discord-rpc] sending activity:", JSON.stringify(payload));
     this.client.setActivity(payload).catch((err: unknown) => console.warn("[discord-rpc] setActivity failed:", err));
   }
 

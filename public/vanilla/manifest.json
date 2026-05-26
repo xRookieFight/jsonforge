@@ -1,0 +1,8 @@
+{
+  "_comment": "Drop vanilla MC Bedrock UI textures into public/vanilla/textures/ui/ and list them below. 'name' is what JSON UI references (e.g. textures/ui/dialog_background_hollow). 'path' is relative to /vanilla/ in the served app. nineSlice optional [left, top, right, bottom].",
+  "textures": [
+    { "name": "textures/ui/dialog_background_hollow", "path": "textures/ui/dialog_background_hollow.png", "nineSlice": [4, 4, 4, 4] },
+    { "name": "textures/ui/button_borderless_light", "path": "textures/ui/button_borderless_light.png", "nineSlice": [2, 2, 2, 2] },
+    { "name": "textures/ui/Black", "path": "textures/ui/Black.png" }
+  ]
+}

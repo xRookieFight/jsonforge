@@ -19,6 +19,18 @@ interface JsonForgeApi {
   menu: {
     on(channel: string, handler: () => void): () => void;
   };
+  discord: {
+    setActivity(activity: {
+      state?: string;
+      details?: string;
+      startTimestamp?: number;
+      largeImageKey?: string;
+      largeImageText?: string;
+      smallImageKey?: string;
+      smallImageText?: string;
+    }): Promise<void>;
+    setIdle(): Promise<void>;
+  };
 }
 
 interface Window {

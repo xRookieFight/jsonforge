@@ -40,6 +40,19 @@ const bridge = {
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     }
+  },
+
+  discord: {
+    setActivity: (activity: {
+      state?: string;
+      details?: string;
+      startTimestamp?: number;
+      largeImageKey?: string;
+      largeImageText?: string;
+      smallImageKey?: string;
+      smallImageText?: string;
+    }): Promise<void> => ipcRenderer.invoke("discord:setActivity", activity),
+    setIdle: (): Promise<void> => ipcRenderer.invoke("discord:setIdle")
   }
 };
 

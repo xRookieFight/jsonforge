@@ -38,7 +38,7 @@ export default defineConfig(function (_a) {
                             build: {
                                 outDir: "dist-electron",
                                 rollupOptions: {
-                                    external: ["electron"]
+                                    external: ["electron", "discord-rpc", "electron-updater"]
                                 }
                             }
                         }

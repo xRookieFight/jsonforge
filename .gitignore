@@ -33,3 +33,5 @@ build/icons/dmg-background.png
 # Test outputs
 test-results
 playwright-report
+
+# Discord RPC client config (keep your client ID local: `git update-index --skip-worktree electron/discordConfig.ts`)

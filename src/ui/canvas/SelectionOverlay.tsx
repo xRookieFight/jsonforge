@@ -32,14 +32,14 @@ const HANDLES: Handle[] = [
 export function SelectionOverlay({ rootBox }: Props) {
   const version = useProjectStore(s => s.version);
   const primary = useProjectStore(s => s.primarySelection);
-  const setProperty = useProjectStore(s => s.setProperty);
+  const setPropertyLive = useProjectStore(s => s.setPropertyLive);
+  const commitPropertyBatch = useProjectStore(s => s.commitPropertyBatch);
   const zoom = useEditorStore(s => s.zoom);
   const snapToGrid = useEditorStore(s => s.snapToGrid);
   const gridSize = useEditorStore(s => s.gridSize);
 
   const [box, setBox] = useState<ResolvedBox | null>(null);
   const [node, setNode] = useState<ElementNode | null>(null);
-  const drag = useRef<{ kind: "move" | "resize"; handle?: Handle; startX: number; startY: number; origOffset: [number, number]; origSize: [number, number] } | null>(null);
 
   useEffect(() => {
     if (!primary) {
@@ -69,74 +69,62 @@ export function SelectionOverlay({ rootBox }: Props) {
     setBox(parentBox);
   }, [primary, version, rootBox]);
 
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      if (!drag.current || !node) return;
-      const dx = (e.clientX - drag.current.startX) / zoom;
-      const dy = (e.clientY - drag.current.startY) / zoom;
-      if (drag.current.kind === "move") {
-        let nx = drag.current.origOffset[0] + dx;
-        let ny = drag.current.origOffset[1] + dy;
-        if (snapToGrid && gridSize > 0) {
-          nx = Math.round(nx / gridSize) * gridSize;
-          ny = Math.round(ny / gridSize) * gridSize;
-        }
-        setProperty(node.id, "offset", [Math.round(nx), Math.round(ny)]);
-      } else if (drag.current.kind === "resize" && drag.current.handle) {
-        const handle = drag.current.handle;
-        let nw = drag.current.origSize[0] + dx * handle.dx;
-        let nh = drag.current.origSize[1] + dy * handle.dy;
-        nw = Math.max(4, nw);
-        nh = Math.max(4, nh);
-        if (snapToGrid && gridSize > 0) {
-          nw = Math.round(nw / gridSize) * gridSize;
-          nh = Math.round(nh / gridSize) * gridSize;
-        }
-        setProperty(node.id, "size", [Math.round(nw), Math.round(nh)]);
-      }
-    };
-    const onUp = () => {
-      drag.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-    if (drag.current) {
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-    }
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  });
-
-  if (!box || !node) return null;
-
   const startMove = (e: React.MouseEvent) => {
     e.stopPropagation();
-    drag.current = {
-      kind: "move",
-      startX: e.clientX,
-      startY: e.clientY,
-      origOffset: ((node.properties["offset"] as [number, number]) ?? [0, 0]).slice() as [number, number],
-      origSize: ((node.properties["size"] as [number, number]) ?? [120, 40]).slice() as [number, number]
-    };
-    const onMove = (ev: MouseEvent) => {
-      if (!drag.current || !node) return;
-      const dx = (ev.clientX - drag.current.startX) / zoom;
-      const dy = (ev.clientY - drag.current.startY) / zoom;
-      let nx = drag.current.origOffset[0] + dx;
-      let ny = drag.current.origOffset[1] + dy;
+    if (!node) return;
+    const origOffset = ((node.properties["offset"] as [number, number]) ?? [0, 0]).slice() as [number, number];
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const id = node.id;
+    let lastOffset: [number, number] = origOffset;
+    let raf = 0;
+    let pendingEv: MouseEvent | null = null;
+
+    const flush = () => {
+      raf = 0;
+      if (!pendingEv) return;
+      const ev = pendingEv;
+      pendingEv = null;
+      const dx = (ev.clientX - startX) / zoom;
+      const dy = (ev.clientY - startY) / zoom;
+      let nx = origOffset[0] + dx;
+      let ny = origOffset[1] + dy;
       if (snapToGrid && gridSize > 0) {
         nx = Math.round(nx / gridSize) * gridSize;
         ny = Math.round(ny / gridSize) * gridSize;
       }
-      setProperty(node.id, "offset", [Math.round(nx), Math.round(ny)]);
+      lastOffset = [Math.round(nx), Math.round(ny)];
+      setPropertyLive(id, "offset", lastOffset);
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      pendingEv = ev;
+      if (!raf) raf = requestAnimationFrame(flush);
     };
     const onUp = () => {
-      drag.current = null;
+      if (raf) cancelAnimationFrame(raf);
+      if (pendingEv) {
+        const ev = pendingEv;
+        pendingEv = null;
+        const dx = (ev.clientX - startX) / zoom;
+        const dy = (ev.clientY - startY) / zoom;
+        let nx = origOffset[0] + dx;
+        let ny = origOffset[1] + dy;
+        if (snapToGrid && gridSize > 0) {
+          nx = Math.round(nx / gridSize) * gridSize;
+          ny = Math.round(ny / gridSize) * gridSize;
+        }
+        lastOffset = [Math.round(nx), Math.round(ny)];
+        setPropertyLive(id, "offset", lastOffset);
+      }
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      if (lastOffset[0] !== origOffset[0] || lastOffset[1] !== origOffset[1]) {
+        commitPropertyBatch(
+          [{ elementId: id, key: "offset", prev: origOffset, next: lastOffset }],
+          "Move"
+        );
+      }
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -144,38 +132,62 @@ export function SelectionOverlay({ rootBox }: Props) {
 
   const startResize = (e: React.MouseEvent, handle: Handle) => {
     e.stopPropagation();
+    if (!node) return;
     const origOffset = ((node.properties["offset"] as [number, number]) ?? [0, 0]).slice() as [number, number];
     const origSize = ((node.properties["size"] as [number, number]) ?? [120, 40]).slice() as [number, number];
-    drag.current = {
-      kind: "resize",
-      handle,
-      startX: e.clientX,
-      startY: e.clientY,
-      origOffset,
-      origSize
-    };
-    const onMove = (ev: MouseEvent) => {
-      if (!drag.current || !drag.current.handle || !node) return;
-      const dx = (ev.clientX - drag.current.startX) / zoom;
-      const dy = (ev.clientY - drag.current.startY) / zoom;
-      let nw = drag.current.origSize[0] + dx * drag.current.handle.dx;
-      let nh = drag.current.origSize[1] + dy * drag.current.handle.dy;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const id = node.id;
+    let lastSize: [number, number] = origSize;
+    let raf = 0;
+    let pendingEv: MouseEvent | null = null;
+
+    const compute = (ev: MouseEvent): [number, number] => {
+      const dx = (ev.clientX - startX) / zoom;
+      const dy = (ev.clientY - startY) / zoom;
+      let nw = origSize[0] + dx * handle.dx;
+      let nh = origSize[1] + dy * handle.dy;
       nw = Math.max(4, nw);
       nh = Math.max(4, nh);
       if (snapToGrid && gridSize > 0) {
         nw = Math.round(nw / gridSize) * gridSize;
         nh = Math.round(nh / gridSize) * gridSize;
       }
-      setProperty(node.id, "size", [Math.round(nw), Math.round(nh)]);
+      return [Math.round(nw), Math.round(nh)];
+    };
+
+    const flush = () => {
+      raf = 0;
+      if (!pendingEv) return;
+      lastSize = compute(pendingEv);
+      pendingEv = null;
+      setPropertyLive(id, "size", lastSize);
+    };
+    const onMove = (ev: MouseEvent) => {
+      pendingEv = ev;
+      if (!raf) raf = requestAnimationFrame(flush);
     };
     const onUp = () => {
-      drag.current = null;
+      if (raf) cancelAnimationFrame(raf);
+      if (pendingEv) {
+        lastSize = compute(pendingEv);
+        pendingEv = null;
+        setPropertyLive(id, "size", lastSize);
+      }
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      if (lastSize[0] !== origSize[0] || lastSize[1] !== origSize[1]) {
+        commitPropertyBatch(
+          [{ elementId: id, key: "size", prev: origSize, next: lastSize }],
+          "Resize"
+        );
+      }
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
+
+  if (!box || !node) return null;
 
   return (
     <div

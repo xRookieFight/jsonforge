@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { ElementNode } from "../core/element/ElementNode";
+import { nanoid } from "nanoid";
+import { ElementNode, ElementNodeData } from "../core/element/ElementNode";
 import { ElementRegistry } from "../core/element/ElementRegistry";
 import { Container } from "../core/di/Container";
 import { ProjectService } from "../core/services/ProjectService";
@@ -23,13 +24,31 @@ interface ProjectStoreState {
   toggleSelect(id: string): void;
   clearSelection(): void;
   setProperty(elementId: string, key: string, value: PropertyValue): void;
+  setPropertyLive(elementId: string, key: string, value: PropertyValue): void;
+  commitProperty(elementId: string, key: string, prev: PropertyValue, next: PropertyValue, label?: string): void;
+  commitPropertyBatch(entries: Array<{ elementId: string; key: string; prev: PropertyValue; next: PropertyValue }>, label?: string): void;
   renameElement(elementId: string, name: string): void;
   addChild(parentId: string, typeId: string): string | null;
   deleteSelected(): void;
   duplicateSelected(): void;
   reorderChild(parentId: string, childId: string, newIndex: number): void;
   reparent(elementId: string, newParentId: string, index?: number): void;
+  moveNode(elementId: string, newParentId: string, index: number): void;
+  copySelection(): void;
+  cutSelection(): void;
+  paste(): void;
+  hasClipboard(): boolean;
   setNamespace(ns: string): void;
+}
+
+const clipboard: { items: ElementNodeData[] } = { items: [] };
+
+function reassignIds(data: ElementNodeData): ElementNodeData {
+  return {
+    ...data,
+    id: nanoid(10),
+    children: (data.children ?? []).map(reassignIds)
+  };
 }
 
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
@@ -94,6 +113,62 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       },
       revert: () => {
         node.properties[key] = prev;
+        project.markDirty();
+      }
+    });
+    get().refreshFromServices();
+  },
+
+  setPropertyLive: (elementId, key, value) => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const node = project.getRoot().findById(elementId);
+    if (!node) return;
+    node.properties[key] = value;
+    project.markDirty();
+    set(s => ({ version: s.version + 1 }));
+  },
+
+  commitProperty: (elementId, key, prev, next, label) => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const node = project.getRoot().findById(elementId);
+    if (!node) return;
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.push({
+      label: label ?? `Set ${key}`,
+      apply: () => {
+        const n = project.getRoot().findById(elementId);
+        if (!n) return;
+        n.properties[key] = next;
+        project.markDirty();
+      },
+      revert: () => {
+        const n = project.getRoot().findById(elementId);
+        if (!n) return;
+        n.properties[key] = prev;
+        project.markDirty();
+      }
+    });
+    get().refreshFromServices();
+  },
+
+  commitPropertyBatch: (entries, label) => {
+    if (entries.length === 0) return;
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.push({
+      label: label ?? "Edit",
+      apply: () => {
+        for (const e of entries) {
+          const n = project.getRoot().findById(e.elementId);
+          if (n) n.properties[e.key] = e.next;
+        }
+        project.markDirty();
+      },
+      revert: () => {
+        for (const e of entries) {
+          const n = project.getRoot().findById(e.elementId);
+          if (n) n.properties[e.key] = e.prev;
+        }
         project.markDirty();
       }
     });
@@ -252,6 +327,96 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     });
     get().refreshFromServices();
   },
+
+  moveNode: (elementId, newParentId, index) => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const node = project.getRoot().findById(elementId);
+    const newParent = project.getRoot().findById(newParentId);
+    if (!node || !newParent || !node.parent) return;
+    if (node === newParent) return;
+    if (newParent.path().includes(node)) return;
+    const prevParent = node.parent;
+    const prevIndex = prevParent.children.indexOf(node);
+    let targetIndex = index;
+    if (newParent === prevParent && targetIndex > prevIndex) targetIndex -= 1;
+    if (newParent === prevParent && targetIndex === prevIndex) return;
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.execute({
+      label: newParent === prevParent ? "Reorder" : "Reparent",
+      apply: () => {
+        prevParent.removeChild(node);
+        newParent.addChild(node, targetIndex);
+        project.markDirty();
+      },
+      revert: () => {
+        newParent.removeChild(node);
+        prevParent.addChild(node, prevIndex);
+        project.markDirty();
+      }
+    });
+    get().refreshFromServices();
+  },
+
+  copySelection: () => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const selection = Container.resolve<SelectionService>(SelectionService.NAME);
+    if (!project.hasProject()) return;
+    const ids = selection.ids();
+    const items: ElementNodeData[] = [];
+    for (const id of ids) {
+      const node = project.getRoot().findById(id);
+      if (node && node.parent) items.push(node.toData());
+    }
+    if (items.length === 0) return;
+    clipboard.items = items;
+  },
+
+  cutSelection: () => {
+    get().copySelection();
+    get().deleteSelected();
+  },
+
+  paste: () => {
+    if (clipboard.items.length === 0) return;
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const selection = Container.resolve<SelectionService>(SelectionService.NAME);
+    if (!project.hasProject()) return;
+    const primary = selection.primary();
+    let parent: ElementNode | null = null;
+    let index: number | undefined = undefined;
+    if (primary) {
+      const node = project.getRoot().findById(primary);
+      if (node) {
+        if (node.children !== undefined && node.parent) {
+          parent = node.parent;
+          index = node.parent.children.indexOf(node) + 1;
+        } else if (node.parent) {
+          parent = node.parent;
+        }
+      }
+    }
+    if (!parent) parent = project.getRoot();
+    const targetParent = parent;
+    const fresh = clipboard.items.map(data => ElementNode.fromData(reassignIds(data)));
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.execute({
+      label: "Paste",
+      apply: () => {
+        fresh.forEach((node, i) => {
+          targetParent.addChild(node, index === undefined ? undefined : index + i);
+        });
+        project.markDirty();
+      },
+      revert: () => {
+        for (const node of fresh) targetParent.removeChild(node);
+        project.markDirty();
+      }
+    });
+    selection.selectMany(fresh.map(n => n.id));
+    get().refreshFromServices();
+  },
+
+  hasClipboard: () => clipboard.items.length > 0,
 
   setNamespace: ns => {
     const project = Container.resolve<ProjectService>(ProjectService.NAME);

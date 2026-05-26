@@ -22,7 +22,14 @@ import { HistoryService } from "./core/services/HistoryService";
 import { KeyboardService } from "./core/services/KeyboardService";
 import { PlatformService } from "./core/services/PlatformService";
 import { JfProjectFormat } from "./core/io/JfProjectFormat";
+import { ElementNode } from "./core/element/ElementNode";
 import { useProjectStore } from "./state/projectStore";
+
+function countElements(node: ElementNode): number {
+  let n = 1;
+  for (const child of node.children) n += countElements(child);
+  return n;
+}
 
 const DEFAULT_LAYOUT: MosaicNode<DockId> = {
   direction: "row",
@@ -67,6 +74,9 @@ export function App() {
   const refresh = useProjectStore(s => s.refreshFromServices);
   const deleteSelected = useProjectStore(s => s.deleteSelected);
   const duplicateSelected = useProjectStore(s => s.duplicateSelected);
+  const copySelection = useProjectStore(s => s.copySelection);
+  const cutSelection = useProjectStore(s => s.cutSelection);
+  const paste = useProjectStore(s => s.paste);
 
   const [showNewProject, setShowNewProject] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -94,12 +104,15 @@ export function App() {
     keyboard.register({ id: "delete", combo: "delete", description: "Delete", handler: () => deleteSelected() });
     keyboard.register({ id: "backspace", combo: "backspace", description: "Delete", handler: () => deleteSelected() });
     keyboard.register({ id: "duplicate", combo: "mod+d", description: "Duplicate", handler: () => duplicateSelected() });
+    keyboard.register({ id: "copy", combo: "mod+c", description: "Copy", handler: () => copySelection() });
+    keyboard.register({ id: "cut", combo: "mod+x", description: "Cut", handler: () => cutSelection() });
+    keyboard.register({ id: "paste", combo: "mod+v", description: "Paste", handler: () => paste() });
     keyboard.register({ id: "newProject", combo: "mod+n", description: "New Project", handler: () => setShowNewProject(true) });
     keyboard.register({ id: "settings", combo: "mod+,", description: "Settings", handler: () => setShowSettings(true) });
     return () => {
-      ["undo", "redo", "delete", "backspace", "duplicate", "newProject", "settings"].forEach(id => keyboard.unregister(id));
+      ["undo", "redo", "delete", "backspace", "duplicate", "copy", "cut", "paste", "newProject", "settings"].forEach(id => keyboard.unregister(id));
     };
-  }, [hasProject, deleteSelected, duplicateSelected]);
+  }, [hasProject, deleteSelected, duplicateSelected, copySelection, cutSelection, paste]);
 
   useEffect(() => {
     const platform = Container.resolve<PlatformService>(PlatformService.NAME);
@@ -114,6 +127,35 @@ export function App() {
     ];
     return () => offs.forEach(off => off());
   }, []);
+
+  useEffect(() => {
+    const api = window.jsonforge;
+    if (!api?.discord) return;
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const push = () => {
+      if (!project.hasProject()) {
+        void api.discord.setIdle();
+        return;
+      }
+      const meta = project.getMeta();
+      const root = project.getRoot();
+      const count = countElements(root);
+      void api.discord.setActivity({
+        details: `Editing ${meta.name}`,
+        state: `${count} element${count === 1 ? "" : "s"} · ${meta.namespace}`,
+        startTimestamp: meta.createdAt
+      });
+    };
+    push();
+    const offChanged = project.bus.on("project:changed", push);
+    const offDirty = project.bus.on("project:tree-changed", push);
+    const offClosed = project.bus.on("project:closed", push);
+    return () => {
+      offChanged();
+      offDirty();
+      offClosed();
+    };
+  }, [hasProject]);
 
   useEffect(() => {
     const api = window.jsonforge;

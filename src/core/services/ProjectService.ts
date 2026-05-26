@@ -1,6 +1,7 @@
 import { Service, ServicePriority } from "../base/Service";
 import { EventBus } from "../event/EventBus";
 import { ElementNode } from "../element/ElementNode";
+import { ProjectTemplates, TemplateId } from "./templates/ProjectTemplates";
 import { nanoid } from "nanoid";
 
 export interface ProjectMeta {
@@ -33,13 +34,8 @@ export class ProjectService extends Service {
     return ServicePriority.PROJECT;
   }
 
-  public createNew(name: string, namespace: string): void {
-    const root = new ElementNode("panel", "root", {
-      size: [1600, 900],
-      offset: [0, 0],
-      anchor_from: "center",
-      anchor_to: "center"
-    });
+  public createNew(name: string, namespace: string, template: TemplateId = "server_form"): void {
+    const { root } = ProjectTemplates.build(template);
     const meta: ProjectMeta = {
       id: nanoid(12),
       name,

@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, join } from "node:path";
 import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
+import { DiscordRpcManager, DiscordActivityState } from "./DiscordRpcManager";
+import { AutoUpdaterManager } from "./AutoUpdaterManager";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
@@ -208,12 +210,28 @@ function parseProjectArg(argv: string[]): string | null {
   return null;
 }
 
+class DiscordBridge {
+  public constructor(private readonly rpc: DiscordRpcManager) {}
+
+  public register(): void {
+    ipcMain.handle("discord:setActivity", (_e, activity: DiscordActivityState) => {
+      this.rpc.setActivity(activity);
+    });
+    ipcMain.handle("discord:setIdle", () => {
+      this.rpc.setIdle();
+    });
+  }
+}
+
 class JsonForgeApp {
   private readonly pending = new PendingOpenQueue();
   private readonly windowManager = new WindowManager(this.pending);
   private readonly fileBridge = new FileBridge();
   private readonly dialogBridge = new DialogBridge();
   private readonly appMenu = new AppMenu();
+  private readonly discordRpc = new DiscordRpcManager();
+  private readonly discordBridge = new DiscordBridge(this.discordRpc);
+  private readonly updater = new AutoUpdaterManager();
 
   public bootstrap(): void {
     const gotLock = app.requestSingleInstanceLock();
@@ -243,13 +261,17 @@ class JsonForgeApp {
 
       this.fileBridge.register();
       this.dialogBridge.register(() => this.windowManager.get());
+      this.discordBridge.register();
       ipcMain.handle("file:consumeOpenRequest", () => this.pending.consume());
 
       const window = this.windowManager.create();
       this.appMenu.build(window);
+      void this.discordRpc.connect();
+      void this.updater.start(() => this.windowManager.get());
     });
 
     app.on("window-all-closed", () => {
+      this.discordRpc.destroy();
       if (process.platform !== "darwin") app.quit();
     });
 

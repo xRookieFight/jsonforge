@@ -37,7 +37,36 @@ export class TextureService extends Service {
       const meta = await this.buildMeta(row.id, row.name, row.mime, row.blob);
       this.cache.set(meta.id, meta);
     }
+    await this.loadVanillaManifest();
     this.bus.emit("texture:list", this.list());
+  }
+
+  private async loadVanillaManifest(): Promise<void> {
+    try {
+      const res = await fetch("vanilla/manifest.json");
+      if (!res.ok) return;
+      const data = await res.json() as { textures?: Array<{ name: string; path: string; nineSlice?: [number, number, number, number] }> };
+      const entries = data.textures ?? [];
+      for (const entry of entries) {
+        const id = "vanilla:" + entry.name;
+        if (this.cache.has(id)) continue;
+        const url = "vanilla/" + entry.path.replace(/^\/+/, "");
+        const probe = await fetch(url, { method: "HEAD" }).catch(() => null);
+        if (!probe || !probe.ok) continue;
+        const dims = await this.measure(url);
+        this.cache.set(id, {
+          id,
+          name: entry.name,
+          mime: "image/png",
+          width: dims.width,
+          height: dims.height,
+          nineSlice: entry.nineSlice ?? [0, 0, 0, 0],
+          url
+        });
+      }
+    } catch {
+      /* manifest missing or invalid — ignore, app still works without vanilla pack */
+    }
   }
 
   public async onDisable(): Promise<void> {

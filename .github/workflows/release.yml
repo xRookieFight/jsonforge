@@ -27,8 +27,3 @@ jobs:
       - run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-      - name: Package + publish to GitHub Release
-        run: npx electron-builder --publish=always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false

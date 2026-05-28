@@ -27,7 +27,7 @@ syncPreloadCjs();
 export default defineConfig(({ mode }) => {
   const isElectron = mode === "electron";
   return {
-    base: "./",
+    base: process.env.VITE_BASE_PATH ?? "./",
     resolve: {
       alias: {
         "@": resolve(__dirname, "src"),

@@ -18,7 +18,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
     "immer": "^10.1.1",
-    "lucide-react": "^0.428.0",
+    "lucide-react": "^1.17.0",
     "monaco-editor": "^0.50.0",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.3.9",

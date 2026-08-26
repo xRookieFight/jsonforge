@@ -31,12 +31,18 @@ application via Electron, from a single codebase.
   `collection_panel`, `scrolling_panel`, `image`, `label`, `button`,
   `input_panel`, `toggle`, `custom`.
 - **Dock layout** (react-mosaic) - Toolbox, Hierarchy,
-  Canvas, Properties, Textures, Bindings, JSON Preview, History panels.
+  Canvas, Properties, Textures, Bindings and JSON Preview panels.
   Drag splitters to resize, drag tabs to rearrange.
-- **Live, pixel-perfect canvas** - every element renders with
-  `image-rendering: pixelated`, nine-slice via CSS `border-image`, real
+- **Live, pixel-perfect canvas** - textures are drawn on a canvas with the
+  same nine-slice algorithm the game uses, at the same scale, with real
   anchors. Edit/Preview toggle hides editor decorations to match the
   in-game look.
+- **Addon export** - `.mcaddon` / `.mcpack` with the JSON UI, the textures,
+  the manifests and, for form screens, the behavior pack script. Three
+  targets: form, HUD overlay, or a restyled vanilla scoreboard with live
+  names and scores.
+- **Bundled preset textures** - five ore-UI style sets plus the Minecraft
+  fonts, ready to drop onto elements.
 - **Welcome screen** - Template gallery and
   Recent Projects on startup.
 - **`.jfproject` bundled format** - one file that contains the element tree,
@@ -49,6 +55,11 @@ application via Electron, from a single codebase.
 - **Undo / Redo** command history.
 - **Native installer** on Windows (NSIS + portable), macOS (DMG), Linux
   (AppImage + deb). Desktop and Start Menu shortcuts.
+
+## Using it
+
+New to JSON UI? **[docs/usage.md](docs/usage.md)** walks through one full round
+trip: draw a screen, wire live values, export a pack, load it in Minecraft.
 
 ## Quick start
 
@@ -90,6 +101,8 @@ The installer registers `.jfproject` with JsonForge automatically.
 | `Ctrl/Cmd+Shift+Z`               | Redo              |
 | `Ctrl/Cmd+D`                     | Duplicate         |
 | `Delete` / `Backspace`           | Delete selection  |
+| Arrow keys                       | Nudge by one unit |
+| `Shift`+arrows                   | Nudge by grid step |
 | Wheel                            | Zoom toward cursor |
 | Drag empty canvas / Alt+drag /<br/>middle-click / right-click / Space+drag | Pan canvas |
 

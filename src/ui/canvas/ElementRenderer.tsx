@@ -7,6 +7,8 @@ import { useProjectStore } from "../../state/projectStore";
 import { useEditorStore } from "../../state/editorStore";
 import { Container } from "../../core/di/Container";
 import { TextureService, TextureMeta } from "../../core/services/TextureService";
+import { TextureCanvas } from "./TextureCanvas";
+import { TEXTURE_MIME, TEXTURE_SLOTS, applyTexture, findTexture } from "./textureDrop";
 
 interface Props {
   node: ElementNode;
@@ -17,7 +19,8 @@ export function ElementRenderer({ node, parentBox }: Props) {
   const selection = useProjectStore(s => s.selection);
   const selectOnly = useProjectStore(s => s.selectOnly);
   const toggleSelect = useProjectStore(s => s.toggleSelect);
-  const setProperty = useProjectStore(s => s.setProperty);
+  const setPropertyLive = useProjectStore(s => s.setPropertyLive);
+  const commitPropertyBatch = useProjectStore(s => s.commitPropertyBatch);
   const viewMode = useEditorStore(s => s.viewMode);
   const showOutlines = useEditorStore(s => s.showOutlines);
 
@@ -31,8 +34,10 @@ export function ElementRenderer({ node, parentBox }: Props) {
   const anchorFrom = (node.properties["anchor_from"] as string) ?? "center";
   const anchorTo = (node.properties["anchor_to"] as string) ?? "center";
   const alpha = (node.properties["alpha"] as number) ?? 1;
+  const layer = (node.properties["layer"] as number) ?? 0;
   const visible = (node.properties["visible"] as boolean) ?? true;
 
+  const textureKey = TEXTURE_SLOTS[meta.id];
   const box = computeBox(parentBox, size, offset, anchorFrom, anchorTo);
   const isSelected = selection.includes(node.id);
   const isPreview = viewMode === "preview";
@@ -47,6 +52,10 @@ export function ElementRenderer({ node, parentBox }: Props) {
     width: box.width,
     height: box.height,
     opacity: alpha,
+    // The game stacks controls by `layer`, so the preview has to as well -
+    // otherwise a label drawn before an image looks buried here but sits on
+    // top in game.
+    zIndex: layer,
     boxSizing: "border-box",
     background: showFrame ? hint.background : "transparent",
     border: isSelected ? "1px solid var(--jf-accent)" : showFrame ? hint.border : "none",
@@ -65,17 +74,17 @@ export function ElementRenderer({ node, parentBox }: Props) {
         else selectOnly(node.id);
       }}
       onDragOver={e => {
-        if (meta.id === "image" && e.dataTransfer.types.includes("application/jsonforge-texture")) {
+        if (textureKey && e.dataTransfer.types.includes(TEXTURE_MIME)) {
           e.preventDefault();
         }
       }}
       onDrop={e => {
-        if (meta.id !== "image") return;
-        const name = e.dataTransfer.getData("application/jsonforge-texture");
+        if (!textureKey) return;
+        const name = e.dataTransfer.getData(TEXTURE_MIME);
         if (!name) return;
         e.preventDefault();
         e.stopPropagation();
-        setProperty(node.id, "texture", name);
+        applyTexture(node, textureKey, name, setPropertyLive, commitPropertyBatch);
       }}
     >
       <RenderBody node={node} meta={meta} hint={hint} showFrame={showFrame} />
@@ -94,8 +103,11 @@ interface BodyProps {
 }
 
 function RenderBody({ node, meta, hint, showFrame }: BodyProps) {
-  if (meta.id === "image") return <ImageBody node={node} />;
   if (meta.id === "label") return <LabelBody node={node} />;
+  if (meta.id === "button") return <ButtonBody node={node} />;
+  const textureKey = TEXTURE_SLOTS[meta.id];
+  if (textureKey && node.properties[textureKey]) return <ImageBody node={node} textureKey={textureKey} />;
+  if (meta.id === "image") return <ImageBody node={node} textureKey="texture" />;
   if (!showFrame) return null;
   return (
     <div className="jf-render__placeholder">
@@ -103,24 +115,6 @@ function RenderBody({ node, meta, hint, showFrame }: BodyProps) {
       <span className="jf-render__name">{node.name}</span>
     </div>
   );
-}
-
-function findTexture(list: TextureMeta[], query: string): TextureMeta | null {
-  if (!query) return null;
-  const lower = query.toLowerCase();
-  const base = lower.split("/").pop() ?? lower;
-  const stem = base.replace(/\.[^.]+$/, "");
-  for (const tex of list) {
-    if (tex.id === query) return tex;
-    if (tex.name === query) return tex;
-  }
-  for (const tex of list) {
-    const texName = tex.name.toLowerCase();
-    const texStem = texName.replace(/\.[^.]+$/, "");
-    if (texName === base || texStem === stem) return tex;
-    if (texStem === lower || texName === lower) return tex;
-  }
-  return null;
 }
 
 function hexToRgba(hex: string, alpha = 1): string {
@@ -132,31 +126,34 @@ function hexToRgba(hex: string, alpha = 1): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function ImageBody({ node }: { node: ElementNode }) {
-  const textureName = String(node.properties["texture"] ?? "");
-  const tint = String(node.properties["color"] ?? "#ffffff");
-  const tiled = String(node.properties["tiled"] ?? "none");
-  const grayscale = Boolean(node.properties["grayscale"]);
+function useTexture(name: string): TextureMeta | null {
   const [meta, setMeta] = useState<TextureMeta | null>(null);
 
   useEffect(() => {
     const service = Container.resolve<TextureService>(TextureService.NAME);
-    setMeta(findTexture(service.list(), textureName));
+    setMeta(findTexture(service.list(), name));
     const offList = service.bus.on<TextureMeta[]>("texture:list", list => {
-      setMeta(findTexture(list, textureName));
+      setMeta(findTexture(list, name));
     });
     const offAdd = service.bus.on<TextureMeta>("texture:added", () => {
-      setMeta(findTexture(service.list(), textureName));
+      setMeta(findTexture(service.list(), name));
     });
     return () => {
       offList();
       offAdd();
     };
-  }, [textureName]);
+  }, [name]);
 
-  const nineSlice = node.properties["nineslice_size"] as [number, number, number, number] | undefined;
-  const hasNineSlice =
-    Array.isArray(nineSlice) && nineSlice.length === 4 && nineSlice.some(v => v !== 0);
+  return meta;
+}
+
+function ImageBody({ node, textureKey }: { node: ElementNode; textureKey: string }) {
+  const textureName = String(node.properties[textureKey] ?? "");
+  const tint = String(node.properties["color"] ?? "#ffffff");
+  const tiled = String(node.properties["tiled"] ?? "none");
+  const grayscale = Boolean(node.properties["grayscale"]);
+  const [width, height] = (node.properties["size"] as [number, number]) ?? [0, 0];
+  const meta = useTexture(textureName);
 
   if (!meta) {
     return (
@@ -166,57 +163,66 @@ function ImageBody({ node }: { node: ElementNode }) {
     );
   }
 
-  if (hasNineSlice && nineSlice) {
-    const [l, t, r, b] = nineSlice;
-    return (
-      <div
-        className="jf-render__image jf-render__image--nineslice"
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderStyle: "solid",
-          borderWidth: `${t}px ${r}px ${b}px ${l}px`,
-          borderImageSource: `url(${meta.url})`,
-          borderImageSlice: `${t} ${r} ${b} ${l} fill`,
-          borderImageRepeat: tiled === "none" ? "stretch" : "repeat",
-          imageRendering: "pixelated",
-          filter: grayscale ? "grayscale(1)" : undefined
-        }}
-      />
-    );
-  }
-
+  const nineSlice = node.properties["nineslice_size"] as [number, number, number, number] | undefined;
   const tintOverlay = tint !== "#ffffff" ? hexToRgba(tint, 0.4) : null;
 
   return (
-    <div className="jf-render__image" style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-      <img
-        src={meta.url}
-        alt={meta.name}
-        draggable={false}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: tiled !== "none" ? "none" : "fill",
-          imageRendering: "pixelated",
-          display: "block",
-          filter: grayscale ? "grayscale(1)" : undefined,
-          pointerEvents: "none"
-        }}
+    <div className="jf-render__image">
+      <TextureCanvas
+        texture={meta}
+        width={width}
+        height={height}
+        nineSlice={Array.isArray(nineSlice) && nineSlice.length === 4 ? nineSlice : undefined}
+        grayscale={grayscale}
+        tiled={tiled !== "none"}
       />
       {tintOverlay && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: tintOverlay,
-            mixBlendMode: "multiply",
-            pointerEvents: "none"
-          }}
-        />
+        <div className="jf-render__tint" style={{ background: tintOverlay }} />
       )}
     </div>
   );
+}
+
+/** Button preview: the state texture plus the text the form will feed. */
+function ButtonBody({ node }: { node: ElementNode }) {
+  const textureName = String(node.properties["default_texture"] ?? "");
+  const [width, height] = (node.properties["size"] as [number, number]) ?? [0, 0];
+  const meta = useTexture(textureName);
+  const text = String(node.properties["text"] ?? "");
+  const alignment = String(node.properties["text_alignment"] ?? "center");
+  const scale = Number(node.properties["font_scale_factor"] ?? 1);
+
+  return (
+    <div className="jf-render__image">
+      {meta && (
+        <TextureCanvas
+          texture={meta}
+          width={width}
+          height={height}
+          nineSlice={node.properties["nineslice_size"] as [number, number, number, number] | undefined}
+        />
+      )}
+      {text && (
+        <div
+          className="jf-render__label mc-font"
+          style={{
+            justifyContent: alignment === "left" ? "flex-start" : alignment === "right" ? "flex-end" : "center",
+            fontSize: 12 * scale,
+            fontFamily: fontFamilyOf(String(node.properties["font_type"] ?? "default")),
+            textShadow: node.properties["shadow"] ? "2px 2px 0 #3f3f3f" : undefined
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Maps a JSON UI font type onto the bundled game fonts. */
+function fontFamilyOf(fontType: string): string {
+  if (fontType === "MinecraftTen") return "MinecraftTen, Minecraft, sans-serif";
+  return "Minecraft, system-ui, sans-serif";
 }
 
 function LabelBody({ node }: { node: ElementNode }) {
@@ -228,21 +234,13 @@ function LabelBody({ node }: { node: ElementNode }) {
   const sizeMap: Record<string, number> = { small: 10, normal: 12, large: 16, extra_large: 20 };
   return (
     <div
-      className="jf-render__label"
+      className="jf-render__label mc-font"
       style={{
-        position: "absolute",
-        inset: 0,
         color,
         fontSize: (sizeMap[fontSize] ?? 12) * scale,
-        display: "flex",
-        alignItems: "center",
         justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start",
-        padding: "0 4px",
-        fontFamily: "MinecraftSeven, system-ui, sans-serif",
-        textShadow: node.properties["shadow"] ? "1px 1px 0 rgba(0,0,0,0.7)" : undefined,
-        pointerEvents: "none",
-        whiteSpace: "nowrap",
-        overflow: "hidden"
+        fontFamily: fontFamilyOf(String(node.properties["font_type"] ?? "default")),
+        textShadow: node.properties["shadow"] ? "2px 2px 0 #3f3f3f" : undefined
       }}
     >
       {text}

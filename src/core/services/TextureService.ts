@@ -4,6 +4,8 @@ import { PersistenceService } from "./PersistenceService";
 import { Container } from "../di/Container";
 import { nanoid } from "nanoid";
 
+export type TextureSource = "user" | "vanilla" | "preset";
+
 export interface TextureMeta {
   id: string;
   name: string;
@@ -11,7 +13,33 @@ export interface TextureMeta {
   width: number;
   height: number;
   nineSlice: [number, number, number, number];
+  /**
+   * Logical size the nine-slice borders refer to. Comes from the sidecar json
+   * of a preset and may differ from the pixel size of the PNG.
+   */
+  baseSize?: [number, number];
   url: string;
+  source: TextureSource;
+  /** Preset style folder the texture belongs to, when source is "preset". */
+  style?: string;
+}
+
+/** Preset styles shipped in public/presets/textures. */
+export const PRESET_STYLES = [
+  "other_ore-ui_style",
+  "red_ore-ui_style",
+  "pink_ore-ui_style",
+  "eternal_ore-ui_style",
+  "turquoise_ore-ui_style"
+] as const;
+
+interface PresetMapping {
+  data?: Array<{ image: string; nineslice?: boolean }>;
+}
+
+interface PresetNineslice {
+  nineslice_size?: number | number[];
+  base_size?: number | [number, number];
 }
 
 export class TextureService extends Service {
@@ -38,7 +66,73 @@ export class TextureService extends Service {
       this.cache.set(meta.id, meta);
     }
     await this.loadVanillaManifest();
+    await this.loadPresets();
     this.bus.emit("texture:list", this.list());
+  }
+
+  /**
+   * Loads the bundled preset styles. Each style folder carries a mapping.json
+   * listing its images plus a sibling .json per texture with the nine-slice
+   * data of the original art.
+   */
+  private async loadPresets(): Promise<void> {
+    for (const style of PRESET_STYLES) {
+      const base = "presets/textures/" + style;
+      let mapping: PresetMapping;
+      try {
+        const res = await fetch(base + "/mapping.json");
+        if (!res.ok) continue;
+        mapping = await res.json() as PresetMapping;
+      } catch {
+        continue;
+      }
+      for (const entry of mapping.data ?? []) {
+        const name = "textures/ui/" + style + "/" + entry.image;
+        const id = "preset:" + style + "/" + entry.image;
+        if (this.cache.has(id)) continue;
+        const url = base + "/" + entry.image + ".png";
+        const dims = await this.measure(url);
+        if (dims.width === 0) continue;
+        const sidecar = await this.loadPresetNineslice(url, entry.nineslice === true);
+        this.cache.set(id, {
+          id,
+          name,
+          mime: "image/png",
+          width: dims.width,
+          height: dims.height,
+          nineSlice: sidecar.nineSlice,
+          baseSize: sidecar.baseSize,
+          url,
+          source: "preset",
+          style
+        });
+      }
+    }
+  }
+
+  private async loadPresetNineslice(
+    pngUrl: string,
+    hasNineslice: boolean
+  ): Promise<{ nineSlice: [number, number, number, number]; baseSize?: [number, number] }> {
+    const none = { nineSlice: [0, 0, 0, 0] as [number, number, number, number] };
+    if (!hasNineslice) return none;
+    try {
+      const res = await fetch(pngUrl.replace(/\.png$/i, ".json"));
+      if (!res.ok) return none;
+      const data = await res.json() as PresetNineslice;
+      const base = data.base_size;
+      const baseSize: [number, number] | undefined =
+        typeof base === "number" ? [base, base] : Array.isArray(base) ? [base[0], base[1]] : undefined;
+      const size = data.nineslice_size;
+      if (typeof size === "number") return { nineSlice: [size, size, size, size], baseSize };
+      if (Array.isArray(size)) {
+        const [l = 0, t = 0, r = l, b = t] = size;
+        return { nineSlice: [l, t, r, b], baseSize };
+      }
+    } catch {
+      /* no sibling json - texture is used without nine-slice */
+    }
+    return none;
   }
 
   private async loadVanillaManifest(): Promise<void> {
@@ -61,7 +155,8 @@ export class TextureService extends Service {
           width: dims.width,
           height: dims.height,
           nineSlice: entry.nineSlice ?? [0, 0, 0, 0],
-          url
+          url,
+          source: "vanilla"
         });
       }
     } catch {
@@ -71,7 +166,9 @@ export class TextureService extends Service {
 
   public async onDisable(): Promise<void> {
     await super.onDisable();
-    for (const meta of this.cache.values()) URL.revokeObjectURL(meta.url);
+    for (const meta of this.cache.values()) {
+      if (meta.source === "user") URL.revokeObjectURL(meta.url);
+    }
     this.cache.clear();
   }
 
@@ -88,6 +185,8 @@ export class TextureService extends Service {
 
   public async remove(id: string): Promise<void> {
     const meta = this.cache.get(id);
+    // Bundled textures are part of the app, not of the user library.
+    if (meta && meta.source !== "user") return;
     if (meta) URL.revokeObjectURL(meta.url);
     this.cache.delete(id);
     const persistence = Container.resolve<PersistenceService>(PersistenceService.NAME);
@@ -107,6 +206,34 @@ export class TextureService extends Service {
     return this.cache.get(id);
   }
 
+  /**
+   * Raw bytes of a texture.
+   *
+   * Uploaded textures are read straight from storage: their object URL is only
+   * good for `<img>`, and fetching a blob: URL is not something every browser
+   * (or content policy) allows.
+   */
+  public async getBytes(id: string): Promise<Uint8Array | null> {
+    const meta = this.cache.get(id);
+    if (!meta) return null;
+    if (meta.source === "user") {
+      const persistence = Container.resolve<PersistenceService>(PersistenceService.NAME);
+      const row = await persistence.getTexture(id);
+      if (!row) return null;
+      return new Uint8Array(await row.blob.arrayBuffer());
+    }
+    const res = await fetch(meta.url);
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  public findByName(name: string): TextureMeta | undefined {
+    for (const meta of this.cache.values()) {
+      if (meta.name === name) return meta;
+    }
+    return undefined;
+  }
+
   public list(): TextureMeta[] {
     return [...this.cache.values()];
   }
@@ -121,7 +248,8 @@ export class TextureService extends Service {
       width: dims.width,
       height: dims.height,
       nineSlice: [0, 0, 0, 0],
-      url
+      url,
+      source: "user"
     };
   }
 

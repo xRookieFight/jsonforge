@@ -1,24 +1,72 @@
+@font-face {
+  font-family: "Minecraft";
+  src: url("../fonts/MinecraftRegular.ttf") format("truetype"), url("/fonts/MinecraftRegular.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Minecraft";
+  src: url("../fonts/MinecraftBold.ttf") format("truetype"), url("/fonts/MinecraftBold.ttf") format("truetype");
+  font-weight: bold;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Minecraft";
+  src: url("../fonts/MinecraftItalic.ttf") format("truetype"), url("/fonts/MinecraftItalic.ttf") format("truetype");
+  font-weight: normal;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Minecraft";
+  src: url("../fonts/MinecraftBoldItalic.ttf") format("truetype"), url("/fonts/MinecraftBoldItalic.ttf") format("truetype");
+  font-weight: bold;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "MinecraftTen";
+  src: url("../fonts/MinecraftTen.ttf") format("truetype"), url("/fonts/MinecraftTen.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
-  --jf-bg-0: #131418;
-  --jf-bg-1: #1a1c21;
-  --jf-bg-2: #20232a;
-  --jf-bg-3: #272a32;
-  --jf-bg-elev: #2b2e38;
-  --jf-border: #34373f;
-  --jf-border-strong: #4a4f5c;
-  --jf-text: #e3e5ea;
-  --jf-text-dim: #9aa0aa;
-  --jf-text-faint: #6e7280;
-  --jf-accent: #f6c453;
-  --jf-accent-strong: #ffd470;
-  --jf-success: #62d28a;
-  --jf-danger: #f0676b;
+  --jf-bg-0: #0e1016;
+  --jf-bg-1: #151823;
+  --jf-bg-2: #1b1f2d;
+  --jf-bg-3: #232838;
+  --jf-bg-elev: #262c3e;
+  --jf-border: #2a3042;
+  --jf-border-soft: #212636;
+  --jf-border-strong: #363d52;
+  --jf-text: #e7e9f0;
+  --jf-text-dim: #98a1b5;
+  --jf-text-faint: #616b83;
+  --jf-accent: #6366f1;
+  --jf-accent-strong: #7d80f6;
+  --jf-accent-press: #5457e0;
+  --jf-accent-soft: rgba(99, 102, 241, 0.14);
+  --jf-accent-ring: rgba(99, 102, 241, 0.35);
+  --jf-accent-contrast: #ffffff;
+  --jf-success: #22c55e;
+  --jf-danger: #ef4444;
+  --jf-warning: #eab308;
   --jf-info: #6cb7f2;
-  --jf-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-  --jf-radius-sm: 3px;
-  --jf-radius: 5px;
-  --jf-radius-lg: 8px;
+  --jf-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --jf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --jf-radius-sm: 6px;
+  --jf-radius: 9px;
+  --jf-radius-lg: 14px;
   --jf-font: "Inter", "Segoe UI", system-ui, sans-serif;
   --jf-font-mono: "JetBrains Mono", "Consolas", monospace;
   --jf-font-size: 12px;
+}
+
+/* Game font, for previews that should read like Minecraft. */
+.mc-font {
+  font-family: "Minecraft", sans-serif;
+  -webkit-font-smoothing: none;
 }

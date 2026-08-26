@@ -1,0 +1,20 @@
+{
+    "data": [
+        {
+            "image": "turquoise_default_button",
+            "nineslice": true
+        },
+        {
+            "image": "turquoise_hover_button",
+            "nineslice": true
+        },
+        {
+            "image": "turquoise_default_background",
+            "nineslice": true
+        },
+        {
+            "image": "turquoise_default_title_background",
+            "nineslice": true
+        }
+    ]
+}

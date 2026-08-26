@@ -19,6 +19,11 @@ export class ElectronPlatformBridge implements PlatformBridge {
     await this.api().fs.writeFile(handle.path, data);
   }
 
+  public async writeBinaryFile(handle: FileHandle, data: Uint8Array): Promise<void> {
+    if (!handle.path) throw new Error("Electron bridge requires a path.");
+    await this.api().fs.writeBinaryFile(handle.path, data);
+  }
+
   public async openFilePicker(filters?: FileFilter[]): Promise<FileHandle | null> {
     const path = await this.api().dialog.openFile(filters);
     if (!path) return null;

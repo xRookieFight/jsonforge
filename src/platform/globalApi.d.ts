@@ -3,6 +3,7 @@ interface JsonForgeApi {
   fs: {
     readFile(path: string, encoding?: BufferEncoding): Promise<string>;
     writeFile(path: string, data: string): Promise<void>;
+    writeBinaryFile(path: string, data: Uint8Array): Promise<void>;
     mkdir(path: string): Promise<void>;
     readdir(path: string): Promise<Array<{ name: string; isDirectory: boolean; isFile: boolean }>>;
     stat(path: string): Promise<{ size: number; mtimeMs: number; isDir: boolean }>;

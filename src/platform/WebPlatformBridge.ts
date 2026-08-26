@@ -1,7 +1,7 @@
 import { DirectoryHandle, FileFilter, FileHandle, MenuChannel, PlatformBridge } from "./PlatformBridge";
 
 interface FileSystemWritableFileStreamLike {
-  write(data: string): Promise<void>;
+  write(data: string | Blob): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -45,10 +45,46 @@ export class WebPlatformBridge implements PlatformBridge {
 
   public async writeFile(handle: FileHandle, data: string): Promise<void> {
     const fileHandle = handle.webHandle as FileSystemFileHandleLike | undefined;
-    if (!fileHandle) throw new Error("Web bridge requires a webHandle to write.");
-    const writable = await fileHandle.createWritable();
-    await writable.write(data);
-    await writable.close();
+    if (fileHandle) {
+      const writable = await fileHandle.createWritable();
+      await writable.write(data);
+      await writable.close();
+      return;
+    }
+    // Firefox has no File System Access API: hand the file to the downloader.
+    this.download(new Blob([data], { type: "application/json" }), handle.name);
+  }
+
+  public async writeBinaryFile(handle: FileHandle, data: Uint8Array): Promise<void> {
+    const blob = new Blob([data.slice().buffer as ArrayBuffer], { type: "application/octet-stream" });
+    const fileHandle = handle.webHandle as FileSystemFileHandleLike | undefined;
+    if (fileHandle) {
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    }
+    // No file system access: fall back to a plain browser download.
+    this.download(blob, handle.name);
+  }
+
+  /**
+   * Saves a blob through a temporary link. The anchor has to sit in the
+   * document and the URL has to outlive the click, or Firefox drops the file.
+   */
+  private download(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = name;
+    anchor.rel = "noopener";
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    setTimeout(() => {
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }, 5000);
   }
 
   public async openFilePicker(filters?: FileFilter[]): Promise<FileHandle | null> {
@@ -77,7 +113,7 @@ export class WebPlatformBridge implements PlatformBridge {
           suggestedName,
           types: filters?.map(f => ({
             description: f.name,
-            accept: { "application/json": f.extensions.map(e => "." + e) }
+            accept: { "application/octet-stream": f.extensions.map(e => "." + e) }
           }))
         });
         return { kind: "file", name: picked.name, webHandle: picked };
@@ -128,9 +164,9 @@ export class WebPlatformBridge implements PlatformBridge {
             name: file.name,
             getFile: async () => file,
             createWritable: async (): Promise<FileSystemWritableFileStreamLike> => {
-              let buffer = "";
+              let buffer: string | Blob = "";
               return {
-                write: async (data: string) => {
+                write: async (data: string | Blob) => {
                   buffer = data;
                 },
                 close: async () => {

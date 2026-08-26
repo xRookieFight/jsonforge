@@ -30,6 +30,18 @@ export class FileService extends Service {
     return handle;
   }
 
+  public async saveBinaryFile(
+    data: Uint8Array,
+    suggestedName: string,
+    filters?: FileFilter[]
+  ): Promise<FileHandle | null> {
+    const bridge = Container.resolve<PlatformService>(PlatformService.NAME).getBridge();
+    const handle = await bridge.saveFilePicker(suggestedName, filters);
+    if (!handle) return null;
+    await bridge.writeBinaryFile(handle, data);
+    return handle;
+  }
+
   public async writeTo(handle: FileHandle, content: string): Promise<void> {
     const bridge = Container.resolve<PlatformService>(PlatformService.NAME).getBridge();
     await bridge.writeFile(handle, content);

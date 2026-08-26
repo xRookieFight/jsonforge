@@ -3,6 +3,7 @@ export interface PlatformBridge {
 
   readFile(handle: FileHandle): Promise<string>;
   writeFile(handle: FileHandle, data: string): Promise<void>;
+  writeBinaryFile(handle: FileHandle, data: Uint8Array): Promise<void>;
   openFilePicker(filters?: FileFilter[]): Promise<FileHandle | null>;
   openDirectoryPicker(): Promise<DirectoryHandle | null>;
   saveFilePicker(suggestedName?: string, filters?: FileFilter[]): Promise<FileHandle | null>;

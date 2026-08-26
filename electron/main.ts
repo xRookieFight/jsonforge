@@ -104,6 +104,9 @@ class FileBridge {
     ipcMain.handle("fs:writeFile", async (_e, path: string, data: string) => {
       await writeFile(path, data, "utf-8");
     });
+    ipcMain.handle("fs:writeBinaryFile", async (_e, path: string, data: Uint8Array) => {
+      await writeFile(path, Buffer.from(data));
+    });
     ipcMain.handle("fs:mkdir", async (_e, path: string) => {
       await mkdir(path, { recursive: true });
     });

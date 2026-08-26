@@ -14,6 +14,7 @@ interface Props {
   onShowSettings(): void;
   onShowAbout(): void;
   onShowNewProject(): void;
+  onShowExportAddon(): void;
   onCloseProject(): void;
 }
 
@@ -22,7 +23,7 @@ interface MenuDef {
   items: Array<{ label: string; shortcut?: string; action(): void } | { separator: true }>;
 }
 
-export function MenuBar({ onShowSettings, onShowAbout, onShowNewProject, onCloseProject }: Props) {
+export function MenuBar({ onShowSettings, onShowAbout, onShowNewProject, onShowExportAddon, onCloseProject }: Props) {
   const namespace = useProjectStore(s => s.namespace);
   const dirty = useProjectStore(s => s.dirty);
   const rootName = useProjectStore(s => s.rootName);
@@ -51,6 +52,7 @@ export function MenuBar({ onShowSettings, onShowAbout, onShowNewProject, onClose
       { separator: true },
       { label: "Import JSON UI...", action: () => importJsonUi() },
       { label: "Export JSON UI...", action: () => exportJsonUi() },
+      { label: "Export Addon (.mcaddon)...", action: onShowExportAddon },
       { separator: true },
       { label: "Close Project", action: onCloseProject }
     ]

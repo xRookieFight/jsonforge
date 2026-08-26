@@ -17,11 +17,12 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
-    "immer": "^10.1.1",
-    "lucide-react": "^0.428.0",
-    "monaco-editor": "^0.50.0",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.3.9",
+    "immer": "^10.1.1",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.428.0",
+    "monaco-editor": "^0.50.0",
     "nanoid": "^5.0.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -58,7 +59,9 @@
       {
         "from": "build/icons",
         "to": "icons",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "fileAssociations": [
@@ -71,8 +74,18 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icons/win/icon.ico",
       "publisherName": "JsonForge"
@@ -96,7 +109,10 @@
       "artifactName": "JsonForge-${version}-portable.exe"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "build/icons/mac/icon.icns",
       "category": "public.app-category.developer-tools"
     },
@@ -104,7 +120,10 @@
       "icon": "build/icons/mac/icon.icns"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "build/icons/png/64x64.png",
       "category": "Development",
       "synopsis": "Visual editor for Minecraft Bedrock JSON UI",

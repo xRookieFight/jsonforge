@@ -7,6 +7,7 @@ const bridge = {
   fs: {
     readFile: (path, encoding) => ipcRenderer.invoke("fs:readFile", path, encoding),
     writeFile: (path, data) => ipcRenderer.invoke("fs:writeFile", path, data),
+    writeBinaryFile: (path, data) => ipcRenderer.invoke("fs:writeBinaryFile", path, data),
     mkdir: (path) => ipcRenderer.invoke("fs:mkdir", path),
     readdir: (path) => ipcRenderer.invoke("fs:readdir", path),
     stat: (path) => ipcRenderer.invoke("fs:stat", path)

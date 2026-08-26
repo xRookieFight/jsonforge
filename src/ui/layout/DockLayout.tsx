@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Mosaic, MosaicWindow, MosaicNode } from "react-mosaic-component";
+import { Mosaic, MosaicWindow, MosaicNode, LegacyMosaicNode } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
 
 export type DockId =
@@ -11,9 +11,12 @@ export type DockId =
   | "bindings"
   | "json";
 
+/** Mosaic 7 stores an n-ary tree but still accepts the old first/second one. */
+export type DockNode = MosaicNode<DockId> | LegacyMosaicNode<DockId>;
+
 interface Props {
   panels: Record<DockId, { title: string; content: ReactNode }>;
-  initial: MosaicNode<DockId>;
+  initial: DockNode;
   onChange?(node: MosaicNode<DockId> | null): void;
 }
 

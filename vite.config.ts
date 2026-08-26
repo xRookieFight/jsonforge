@@ -68,9 +68,12 @@ export default defineConfig(({ mode }) => {
       target: "es2022",
       rollupOptions: {
         output: {
-          manualChunks: {
-            monaco: ["monaco-editor", "@monaco-editor/react"],
-            vendor: ["react", "react-dom", "zustand", "immer"]
+          // Rolldown (Vite 8) only takes the function form here.
+          manualChunks(id: string) {
+            if (!id.includes("node_modules")) return undefined;
+            if (id.includes("monaco-editor") || id.includes("@monaco-editor")) return "monaco";
+            if (/node_modules\/(react|react-dom|scheduler|zustand|immer)\//.test(id)) return "vendor";
+            return undefined;
           }
         }
       }

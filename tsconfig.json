@@ -18,14 +18,13 @@
     "noFallthroughCasesInSwitch": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@core/*": ["src/core/*"],
-      "@ui/*": ["src/ui/*"],
-      "@platform/*": ["src/platform/*"],
-      "@state/*": ["src/state/*"],
-      "@hooks/*": ["src/hooks/*"]
+      "@/*": ["./src/*"],
+      "@core/*": ["./src/core/*"],
+      "@ui/*": ["./src/ui/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@state/*": ["./src/state/*"],
+      "@hooks/*": ["./src/hooks/*"]
     }
   },
   "include": ["src", "electron"],

@@ -1,12 +1,3 @@
-var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
-    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
-        if (ar || !(i in from)) {
-            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
-            ar[i] = from[i];
-        }
-    }
-    return to.concat(ar || Array.prototype.slice.call(from));
-};
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron";
@@ -14,9 +5,9 @@ import renderer from "vite-plugin-electron-renderer";
 import { resolve } from "node:path";
 import { mkdirSync, existsSync, copyFileSync } from "node:fs";
 function syncPreloadCjs() {
-    var src = resolve(__dirname, "electron/preload.cjs");
-    var dir = resolve(__dirname, "dist-electron");
-    var dest = resolve(dir, "preload.cjs");
+    const src = resolve(__dirname, "electron/preload.cjs");
+    const dir = resolve(__dirname, "dist-electron");
+    const dest = resolve(dir, "preload.cjs");
     if (!existsSync(dir))
         mkdirSync(dir, { recursive: true });
     copyFileSync(src, dest);
@@ -24,18 +15,16 @@ function syncPreloadCjs() {
 function copyPreloadCjs() {
     return {
         name: "copy-preload-cjs",
-        buildStart: function () { syncPreloadCjs(); },
-        closeBundle: function () { syncPreloadCjs(); },
-        configureServer: function () { syncPreloadCjs(); }
+        buildStart() { syncPreloadCjs(); },
+        closeBundle() { syncPreloadCjs(); },
+        configureServer() { syncPreloadCjs(); }
     };
 }
 syncPreloadCjs();
-export default defineConfig(function (_a) {
-    var _b;
-    var mode = _a.mode;
-    var isElectron = mode === "electron";
+export default defineConfig(({ mode }) => {
+    const isElectron = mode === "electron";
     return {
-        base: (_b = process.env.VITE_BASE_PATH) !== null && _b !== void 0 ? _b : "./",
+        base: process.env.VITE_BASE_PATH ?? "./",
         resolve: {
             alias: {
                 "@": resolve(__dirname, "src"),
@@ -46,38 +35,45 @@ export default defineConfig(function (_a) {
                 "@hooks": resolve(__dirname, "src/hooks")
             }
         },
-        plugins: __spreadArray([
-            react()
-        ], (isElectron
-            ? [
-                electron([
-                    {
-                        entry: "electron/main.ts",
-                        vite: {
-                            plugins: [copyPreloadCjs()],
-                            build: {
-                                outDir: "dist-electron",
-                                emptyOutDir: false,
-                                rollupOptions: {
-                                    external: ["electron", "discord-rpc", "electron-updater"]
+        plugins: [
+            react(),
+            ...(isElectron
+                ? [
+                    electron([
+                        {
+                            entry: "electron/main.ts",
+                            vite: {
+                                plugins: [copyPreloadCjs()],
+                                build: {
+                                    outDir: "dist-electron",
+                                    emptyOutDir: false,
+                                    rollupOptions: {
+                                        external: ["electron", "discord-rpc", "electron-updater"]
+                                    }
                                 }
                             }
                         }
-                    }
-                ]),
-                copyPreloadCjs(),
-                renderer()
-            ]
-            : []), true),
+                    ]),
+                    copyPreloadCjs(),
+                    renderer()
+                ]
+                : [])
+        ],
         build: {
             outDir: "dist",
             sourcemap: true,
             target: "es2022",
             rollupOptions: {
                 output: {
-                    manualChunks: {
-                        monaco: ["monaco-editor", "@monaco-editor/react"],
-                        vendor: ["react", "react-dom", "zustand", "immer"]
+                    // Rolldown (Vite 8) only takes the function form here.
+                    manualChunks(id) {
+                        if (!id.includes("node_modules"))
+                            return undefined;
+                        if (id.includes("monaco-editor") || id.includes("@monaco-editor"))
+                            return "monaco";
+                        if (/node_modules\/(react|react-dom|scheduler|zustand|immer)\//.test(id))
+                            return "vendor";
+                        return undefined;
                     }
                 }
             }

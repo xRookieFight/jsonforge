@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { MosaicNode } from "react-mosaic-component";
+
 import { MenuBar } from "./ui/layout/MenuBar";
 import { StatusBar } from "./ui/layout/StatusBar";
-import { DockLayout, DockId } from "./ui/layout/DockLayout";
+import { DockLayout, DockId, DockNode } from "./ui/layout/DockLayout";
 import { ToolboxPanel } from "./ui/panels/ToolboxPanel";
 import { HierarchyPanel } from "./ui/panels/HierarchyPanel";
 import { CanvasPanel } from "./ui/panels/CanvasPanel";
@@ -32,7 +32,7 @@ function countElements(node: ElementNode): number {
   return n;
 }
 
-const DEFAULT_LAYOUT: MosaicNode<DockId> = {
+const DEFAULT_LAYOUT: DockNode = {
   direction: "row",
   first: {
     direction: "column",
@@ -79,7 +79,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showExportAddon, setShowExportAddon] = useState(false);
-  const [layout, setLayout] = useState<MosaicNode<DockId> | null>(DEFAULT_LAYOUT);
+  const [layout, setLayout] = useState<DockNode | null>(DEFAULT_LAYOUT);
   const [hasProject, setHasProject] = useState(false);
 
   useEffect(() => {

@@ -1,8 +1,11 @@
 {
   "name": "jsonforge",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Visual JSON UI editor for Minecraft: Bedrock Edition.",
-  "author": "JsonForge Developer Team",
+  "author": {
+    "name": "JsonForge Developer Team",
+    "email": "jsonforge@users.noreply.github.com"
+  },
   "license": "MIT",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -87,8 +90,7 @@
           ]
         }
       ],
-      "icon": "build/icons/win/icon.ico",
-      "publisherName": "JsonForge"
+      "icon": "build/icons/win/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -124,7 +126,7 @@
         "AppImage",
         "deb"
       ],
-      "icon": "build/icons/png/64x64.png",
+      "icon": "build/icons/png/512x512.png",
       "category": "Development",
       "synopsis": "Visual editor for Minecraft Bedrock JSON UI",
       "description": "JSON UI editor for Minecraft Bedrock Edition."

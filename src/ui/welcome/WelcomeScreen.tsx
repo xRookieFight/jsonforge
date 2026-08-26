@@ -1,5 +1,16 @@
 import { useEffect, useState } from "react";
-import { Hammer, Home, FilePlus2, FolderOpen, FileInput, Package, FileText } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronRight,
+  Clock,
+  FileInput,
+  FilePlus2,
+  FileText,
+  FolderOpen,
+  Hammer,
+  Home,
+  Package
+} from "lucide-react";
 import { Container } from "../../core/di/Container";
 import { ProjectService } from "../../core/services/ProjectService";
 import { PersistenceService } from "../../core/services/PersistenceService";
@@ -14,6 +25,8 @@ import { nanoid } from "nanoid";
 interface Props {
   onEnter(): void;
 }
+
+const APP_VERSION = "0.1.1";
 
 interface RecentEntry {
   id: string;
@@ -33,13 +46,13 @@ const TEMPLATES: Template[] = [
   {
     id: "blank",
     title: "Blank Form",
-    description: "Empty 1600×900 root panel. Build from scratch.",
+    description: "Empty 384×216 screen in JSON UI units. Build from scratch.",
     badge: "blank",
     factory: () => ({
       name: "blank_form",
       namespace: "custom_namespace",
       root: new ElementNode("panel", "root", {
-        size: [1600, 900],
+        size: [384, 216],
         anchor_from: "center",
         anchor_to: "center"
       })
@@ -52,7 +65,7 @@ const TEMPLATES: Template[] = [
     badge: "dialog",
     factory: () => {
       const root = new ElementNode("panel", "root", {
-        size: [1600, 900],
+        size: [384, 216],
         anchor_from: "center",
         anchor_to: "center"
       });
@@ -68,7 +81,7 @@ const TEMPLATES: Template[] = [
     badge: "list",
     factory: () => {
       const root = new ElementNode("panel", "root", {
-        size: [1600, 900],
+        size: [384, 216],
         anchor_from: "center",
         anchor_to: "center"
       });
@@ -78,26 +91,161 @@ const TEMPLATES: Template[] = [
     }
   },
   {
+    id: "scoreboard",
+    title: "Scoreboard Sidebar",
+    description:
+      "Top-right sidebar HUD, the Hive style. Restyles the vanilla sidebar; the script creates the objective and puts it on display.",
+    badge: "sidebar",
+    factory: () => {
+      const root = new ElementNode("panel", "root", {
+        size: [384, 216],
+        anchor_from: "center",
+        anchor_to: "center"
+      });
+
+      // The sidebar hangs on the right edge, a bit below the top - the same
+      // corner the vanilla scoreboard uses.
+      const sidebar = new ElementNode("panel", "sidebar", {
+        size: [96, 74],
+        offset: [-4, 30],
+        anchor_from: "top_right",
+        anchor_to: "top_right"
+      });
+
+      sidebar.addChild(
+        new ElementNode("label", "sidebar_title", {
+          size: [96, 12],
+          offset: [0, 2],
+          anchor_from: "top_middle",
+          anchor_to: "top_middle",
+          text: "MY SERVER",
+          color: "#ffd166",
+          text_alignment: "center",
+          font_size: "large",
+          shadow: true
+        })
+      );
+
+      const lines = ["Rank: Member", "Coins: 0", "Kills: 0", "Wins: 0"];
+      lines.forEach((text, index) => {
+        sidebar.addChild(
+          new ElementNode("label", `sidebar_line_${index + 1}`, {
+            size: [90, 10],
+            offset: [4, 18 + index * 12],
+            anchor_from: "top_left",
+            anchor_to: "top_left",
+            text,
+            color: "#ffffff",
+            text_alignment: "left",
+            shadow: true
+          })
+        );
+      });
+
+      root.addChild(sidebar);
+      return { name: "scoreboard_sidebar", namespace: "custom_namespace", root };
+    }
+  },
+  {
+    id: "stats-menu",
+    title: "Stats Menu",
+    description: "Centered form with buttons that read and change a scoreboard objective when clicked.",
+    badge: "score",
+    factory: () => {
+      const root = new ElementNode("panel", "root", {
+        size: [384, 216],
+        anchor_from: "center",
+        anchor_to: "center"
+      });
+      const panel = new ElementNode("panel", "score_panel", {
+        size: [200, 140],
+        anchor_from: "center",
+        anchor_to: "center"
+      });
+      panel.addChild(
+        new ElementNode("label", "score_title", {
+          size: [180, 14],
+          offset: [0, 8],
+          anchor_from: "top_middle",
+          anchor_to: "top_middle",
+          text: "Stats",
+          color: "#ffffff",
+          text_alignment: "center",
+          font_size: "large",
+          shadow: true
+        })
+      );
+
+      // The score placeholder is filled in by the generated script every time
+      // the form opens, so the button doubles as a live readout.
+      const buttons: Array<{ name: string; text: string; props: Record<string, unknown> }> = [
+        { name: "coins_readout", text: "Coins: {score:coins}", props: { action_type: "none" } },
+        {
+          name: "earn_button",
+          text: "Earn 5 coins",
+          props: {
+            action_type: "scoreboard",
+            scoreboard_objective: "coins",
+            scoreboard_operation: "add",
+            scoreboard_amount: 5
+          }
+        },
+        {
+          name: "spend_button",
+          text: "Spend 5 coins",
+          props: {
+            action_type: "scoreboard",
+            scoreboard_objective: "coins",
+            scoreboard_operation: "remove",
+            scoreboard_amount: 5
+          }
+        },
+        {
+          name: "reset_button",
+          text: "Reset",
+          props: { action_type: "scoreboard", scoreboard_objective: "coins", scoreboard_operation: "reset" }
+        }
+      ];
+
+      buttons.forEach((button, index) => {
+        panel.addChild(
+          new ElementNode("button", button.name, {
+            size: [170, 22],
+            offset: [0, 30 + index * 26],
+            anchor_from: "top_middle",
+            anchor_to: "top_middle",
+            text: button.text,
+            text_alignment: "center",
+            ...button.props
+          })
+        );
+      });
+
+      root.addChild(panel);
+      return { name: "stats_menu", namespace: "custom_namespace", root };
+    }
+  },
+  {
     id: "hud",
     title: "HUD Overlay",
     description: "Top-left stat panel + bottom hotbar slots. Good starting HUD modification.",
     badge: "hud",
     factory: () => {
       const root = new ElementNode("panel", "root", {
-        size: [1600, 900],
+        size: [384, 216],
         anchor_from: "center",
         anchor_to: "center"
       });
       const stats = new ElementNode("stack_panel", "stat_stack", {
-        size: [220, 80],
-        offset: [12, 12],
+        size: [110, 40],
+        offset: [6, 6],
         anchor_from: "top_left",
         anchor_to: "top_left",
         orientation: "vertical"
       });
       stats.addChild(
         new ElementNode("label", "health_label", {
-          size: [220, 18],
+          size: [110, 10],
           text: "HP 20 / 20",
           color: "#ff5d5d",
           font_size: "large"
@@ -105,15 +253,15 @@ const TEMPLATES: Template[] = [
       );
       stats.addChild(
         new ElementNode("label", "hunger_label", {
-          size: [220, 18],
+          size: [110, 10],
           text: "Hunger 20",
           color: "#f7c45c",
           font_size: "large"
         })
       );
       const hotbar = new ElementNode("stack_panel", "hotbar", {
-        size: [360, 40],
-        offset: [0, -12],
+        size: [182, 22],
+        offset: [0, -6],
         anchor_from: "bottom_middle",
         anchor_to: "bottom_middle",
         orientation: "horizontal"
@@ -121,7 +269,7 @@ const TEMPLATES: Template[] = [
       for (let i = 0; i < 9; i++) {
         hotbar.addChild(
           new ElementNode("image", `slot_${i}`, {
-            size: [40, 40],
+            size: [20, 20],
             texture: "textures/ui/hotbar_slot"
           })
         );
@@ -221,37 +369,75 @@ export function WelcomeScreen({ onEnter }: Props) {
 
   return (
     <div className="jf-welcome">
-      <div className="jf-welcome__sidebar">
+      <aside className="jf-welcome__sidebar">
         <div className="jf-welcome__brand">
-          <Hammer size={26} strokeWidth={2.25} className="jf-welcome__logo" />
-          <div>
+          <span className="jf-welcome__logo-tile">
+            <Hammer size={20} strokeWidth={2.25} className="jf-welcome__logo" />
+          </span>
+          <div className="jf-welcome__brand-text">
             <div className="jf-welcome__title">JsonForge</div>
-            <div className="jf-welcome__subtitle">Minecraft Bedrock JSON UI Editor</div>
+            <div className="jf-welcome__subtitle">Bedrock JSON UI editor</div>
           </div>
         </div>
+
         <nav className="jf-welcome__nav">
-          <button type="button" className="jf-welcome__nav-btn" onClick={() => setCreating(false)}>
+          <div className="jf-welcome__nav-caption">Start</div>
+          <button
+            type="button"
+            className={"jf-welcome__nav-btn" + (creating ? "" : " jf-welcome__nav-btn--active")}
+            onClick={() => setCreating(false)}
+          >
             <Home size={15} strokeWidth={1.75} className="jf-welcome__nav-icon" />
-            Home
+            <span>Home</span>
           </button>
-          <button type="button" className="jf-welcome__nav-btn" onClick={() => setCreating(true)}>
+          <button
+            type="button"
+            className={"jf-welcome__nav-btn" + (creating ? " jf-welcome__nav-btn--active" : "")}
+            onClick={() => setCreating(true)}
+          >
             <FilePlus2 size={15} strokeWidth={1.75} className="jf-welcome__nav-icon" />
-            New Project
+            <span>New Project</span>
+            <kbd>Ctrl N</kbd>
           </button>
           <button type="button" className="jf-welcome__nav-btn" onClick={openProjectFile}>
             <FolderOpen size={15} strokeWidth={1.75} className="jf-welcome__nav-icon" />
-            Open Project...
+            <span>Open Project</span>
+            <kbd>Ctrl O</kbd>
           </button>
           <button type="button" className="jf-welcome__nav-btn" onClick={importJsonUi}>
             <FileInput size={15} strokeWidth={1.75} className="jf-welcome__nav-icon" />
-            Import JSON UI...
+            <span>Import JSON UI</span>
           </button>
         </nav>
-        <div className="jf-welcome__footer">
-          <span>v0.1.0</span>
-          <span>· client-only</span>
+
+        <div className="jf-welcome__nav">
+          <div className="jf-welcome__nav-caption">
+            Recent <span>{recents.length}</span>
+          </div>
+          {recents.length === 0 ? (
+            <p className="jf-welcome__nav-empty">Saved projects show up here.</p>
+          ) : (
+            recents.slice(0, 5).map(entry => (
+              <button
+                key={entry.id}
+                type="button"
+                className="jf-welcome__nav-btn jf-welcome__nav-btn--recent"
+                title={`${entry.name} · ${formatDate(entry.updatedAt)}`}
+                onClick={() => openRecent(entry.id)}
+              >
+                <Clock size={14} strokeWidth={1.75} className="jf-welcome__nav-icon" />
+                <span>{entry.name}</span>
+                <ChevronRight size={13} strokeWidth={1.75} className="jf-welcome__nav-go" />
+              </button>
+            ))
+          )}
         </div>
-      </div>
+
+        <div className="jf-welcome__footer">
+          <span className="jf-welcome__version">v{APP_VERSION}</span>
+          <span className="jf-welcome__tag">client-only</span>
+        </div>
+      </aside>
       <div className="jf-welcome__main">
         {creating ? (
           <div className="jf-welcome__create">
@@ -275,11 +461,30 @@ export function WelcomeScreen({ onEnter }: Props) {
         ) : (
           <>
             <div className="jf-welcome__hero">
-              <h1>Welcome back</h1>
+              <span className="jf-welcome__hero-badge">Minecraft Bedrock · JSON UI</span>
+              <h1>Build screens the game already understands</h1>
               <p className="jf-welcome__lead">
-                Visually design Minecraft Bedrock JSON UI screens. Pick a template, open a recent project,
-                or import an existing <code>.json</code> file.
+                Draw the interface, drop in textures, export a ready <code>.mcaddon</code>.
+                Start from a template, reopen a recent project or import an existing
+                <code>.json</code> file.
               </p>
+              <div className="jf-welcome__quick">
+                <button type="button" className="jf-quick-card" onClick={() => setCreating(true)}>
+                  <FilePlus2 size={16} strokeWidth={1.75} />
+                  <span className="jf-quick-card__title">New Project</span>
+                  <span className="jf-quick-card__hint">Blank screen, your namespace</span>
+                </button>
+                <button type="button" className="jf-quick-card" onClick={openProjectFile}>
+                  <FolderOpen size={16} strokeWidth={1.75} />
+                  <span className="jf-quick-card__title">Open Project</span>
+                  <span className="jf-quick-card__hint">.jfproject or outline</span>
+                </button>
+                <button type="button" className="jf-quick-card" onClick={importJsonUi}>
+                  <FileInput size={16} strokeWidth={1.75} />
+                  <span className="jf-quick-card__title">Import JSON UI</span>
+                  <span className="jf-quick-card__hint">Bring a vanilla file in</span>
+                </button>
+              </div>
             </div>
 
             <section className="jf-welcome__section">
@@ -315,9 +520,10 @@ export function WelcomeScreen({ onEnter }: Props) {
                   {recents.map(entry => (
                     <li key={entry.id}>
                       <button type="button" className="jf-recent-row" onClick={() => openRecent(entry.id)}>
-                        <FileText size={14} strokeWidth={1.75} className="jf-recent-row__icon" />
+                        <FileText size={15} strokeWidth={1.75} className="jf-recent-row__icon" />
                         <span className="jf-recent-row__name">{entry.name}</span>
                         <span className="jf-recent-row__date">{formatDate(entry.updatedAt)}</span>
+                        <ArrowRight size={13} strokeWidth={1.75} className="jf-recent-row__go" />
                       </button>
                     </li>
                   ))}

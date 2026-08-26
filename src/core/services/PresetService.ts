@@ -48,19 +48,19 @@ export class PresetService extends Service {
       description: "Centered dialog with nine-slice background.",
       factory: () => {
         const dialog = new ElementNode("panel", "dialog_panel", {
-          size: [360, 220],
+          size: [180, 110],
           anchor_from: "center",
           anchor_to: "center"
         });
         const bg = new ElementNode("image", "dialog_bg", {
-          size: [360, 220],
+          size: [180, 110],
           texture: "textures/ui/dialog_background_opaque",
           nineslice_size: [8, 8, 8, 8]
         });
         const title = new ElementNode("label", "dialog_title", {
           text: "Title",
-          size: [320, 24],
-          offset: [0, 12],
+          size: [160, 14],
+          offset: [0, 8],
           anchor_from: "top_middle",
           anchor_to: "top_middle",
           color: "#ffffff"
@@ -77,13 +77,13 @@ export class PresetService extends Service {
       description: "Button with default/hover/pressed controls.",
       factory: () => {
         const button = new ElementNode("button", "standard_button", {
-          size: [160, 40],
+          size: [80, 20],
           anchor_from: "center",
           anchor_to: "center"
         });
         const label = new ElementNode("label", "button_label", {
           text: "Click",
-          size: [160, 40],
+          size: [80, 20],
           color: "#ffffff",
           text_alignment: "center"
         });
@@ -98,16 +98,16 @@ export class PresetService extends Service {
       description: "Scrolling stack of collection buttons.",
       factory: () => {
         const scroll = new ElementNode("scrolling_panel", "form_scroll", {
-          size: [320, 400],
+          size: [160, 150],
           anchor_from: "center",
           anchor_to: "center"
         });
         const stack = new ElementNode("stack_panel", "form_stack", {
-          size: [320, 400],
+          size: [160, 150],
           orientation: "vertical"
         });
         const collection = new ElementNode("collection_panel", "form_buttons", {
-          size: [320, 40],
+          size: [160, 20],
           collection_name: "form_buttons"
         });
         stack.addChild(collection);

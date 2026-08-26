@@ -24,7 +24,7 @@ export class ProjectTemplates {
 
   private static blank(): TemplateBuildResult {
     const root = make("panel", "root", {
-      size: [1600, 900],
+      size: [384, 216],
       offset: [0, 0],
       anchor_from: "center",
       anchor_to: "center"
@@ -34,21 +34,21 @@ export class ProjectTemplates {
 
   private static serverForm(): TemplateBuildResult {
     const root = make("panel", "root", {
-      size: [1600, 900],
+      size: [384, 216],
       offset: [0, 0],
       anchor_from: "center",
       anchor_to: "center"
     });
 
     const formRoot = make("panel", "long_form", {
-      size: [240, 220],
+      size: [180, 140],
       offset: [0, 0],
       anchor_from: "center",
       anchor_to: "center"
     });
 
     const background = make("image", "form_background", {
-      size: [240, 220],
+      size: [180, 140],
       offset: [0, 0],
       anchor_from: "center",
       anchor_to: "center",
@@ -57,8 +57,8 @@ export class ProjectTemplates {
     });
 
     const title = make("label", "form_title", {
-      size: [220, 20],
-      offset: [0, 8],
+      size: [160, 14],
+      offset: [0, 6],
       anchor_from: "top_middle",
       anchor_to: "top_middle",
       text: "Form Title",
@@ -69,15 +69,15 @@ export class ProjectTemplates {
     });
 
     const body = make("stack_panel", "form_body", {
-      size: [220, 140],
-      offset: [0, 34],
+      size: [160, 80],
+      offset: [0, 26],
       anchor_from: "top_middle",
       anchor_to: "top_middle",
       orientation: "vertical"
     });
 
     const bodyText = make("label", "body_text", {
-      size: [220, 40],
+      size: [160, 24],
       offset: [0, 0],
       anchor_from: "top_left",
       anchor_to: "top_left",
@@ -88,8 +88,8 @@ export class ProjectTemplates {
     });
 
     const button = make("button", "form_button", {
-      size: [200, 24],
-      offset: [0, -16],
+      size: [140, 20],
+      offset: [0, -10],
       anchor_from: "bottom_middle",
       anchor_to: "bottom_middle",
       default_control: "button.default",
@@ -99,7 +99,7 @@ export class ProjectTemplates {
     });
 
     const buttonBg = make("image", "button_background", {
-      size: [200, 24],
+      size: [140, 20],
       offset: [0, 0],
       anchor_from: "center",
       anchor_to: "center",
@@ -108,7 +108,7 @@ export class ProjectTemplates {
     });
 
     const buttonLabel = make("label", "button_text", {
-      size: [200, 24],
+      size: [140, 20],
       offset: [0, 0],
       anchor_from: "center",
       anchor_to: "center",

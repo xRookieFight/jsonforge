@@ -39,6 +39,7 @@ interface ProjectStoreState {
   paste(): void;
   hasClipboard(): boolean;
   setNamespace(ns: string): void;
+  nudgeSelection(dx: number, dy: number): void;
 }
 
 const clipboard: { items: ElementNodeData[] } = { items: [] };
@@ -417,6 +418,39 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   },
 
   hasClipboard: () => clipboard.items.length > 0,
+
+  nudgeSelection: (dx, dy) => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const selection = Container.resolve<SelectionService>(SelectionService.NAME);
+    if (!project.hasProject()) return;
+    const entries: Array<{ elementId: string; prev: [number, number]; next: [number, number] }> = [];
+    for (const id of selection.ids()) {
+      const node = project.getRoot().findById(id);
+      if (!node || node.locked) continue;
+      const prev = ((node.properties["offset"] as [number, number]) ?? [0, 0]).slice() as [number, number];
+      entries.push({ elementId: id, prev, next: [prev[0] + dx, prev[1] + dy] });
+    }
+    if (entries.length === 0) return;
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.execute({
+      label: "Nudge",
+      apply: () => {
+        for (const entry of entries) {
+          const node = project.getRoot().findById(entry.elementId);
+          if (node) node.properties["offset"] = entry.next;
+        }
+        project.markDirty();
+      },
+      revert: () => {
+        for (const entry of entries) {
+          const node = project.getRoot().findById(entry.elementId);
+          if (node) node.properties["offset"] = entry.prev;
+        }
+        project.markDirty();
+      }
+    });
+    get().refreshFromServices();
+  },
 
   setNamespace: ns => {
     const project = Container.resolve<ProjectService>(ProjectService.NAME);

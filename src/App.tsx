@@ -10,10 +10,10 @@ import { PropertiesPanel } from "./ui/panels/PropertiesPanel";
 import { TexturesPanel } from "./ui/panels/TexturesPanel";
 import { BindingsPanel } from "./ui/panels/BindingsPanel";
 import { JsonPreviewPanel } from "./ui/panels/JsonPreviewPanel";
-import { HistoryPanel } from "./ui/panels/HistoryPanel";
 import { NewProjectModal } from "./ui/modals/NewProjectModal";
 import { SettingsModal } from "./ui/modals/SettingsModal";
 import { AboutModal } from "./ui/modals/AboutModal";
+import { ExportAddonModal } from "./ui/modals/ExportAddonModal";
 import { WelcomeScreen } from "./ui/welcome/WelcomeScreen";
 import { useServiceSync } from "./hooks/useServices";
 import { Container } from "./core/di/Container";
@@ -24,6 +24,7 @@ import { PlatformService } from "./core/services/PlatformService";
 import { JfProjectFormat } from "./core/io/JfProjectFormat";
 import { ElementNode } from "./core/element/ElementNode";
 import { useProjectStore } from "./state/projectStore";
+import { useEditorStore } from "./state/editorStore";
 
 function countElements(node: ElementNode): number {
   let n = 1;
@@ -44,13 +45,8 @@ const DEFAULT_LAYOUT: MosaicNode<DockId> = {
     first: {
       direction: "column",
       first: "canvas",
-      second: {
-        direction: "row",
-        first: "json",
-        second: "history",
-        splitPercentage: 60
-      },
-      splitPercentage: 65
+      second: "json",
+      splitPercentage: 68
     },
     second: {
       direction: "column",
@@ -77,10 +73,12 @@ export function App() {
   const copySelection = useProjectStore(s => s.copySelection);
   const cutSelection = useProjectStore(s => s.cutSelection);
   const paste = useProjectStore(s => s.paste);
+  const nudgeSelection = useProjectStore(s => s.nudgeSelection);
 
   const [showNewProject, setShowNewProject] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showExportAddon, setShowExportAddon] = useState(false);
   const [layout, setLayout] = useState<MosaicNode<DockId> | null>(DEFAULT_LAYOUT);
   const [hasProject, setHasProject] = useState(false);
 
@@ -109,10 +107,40 @@ export function App() {
     keyboard.register({ id: "paste", combo: "mod+v", description: "Paste", handler: () => paste() });
     keyboard.register({ id: "newProject", combo: "mod+n", description: "New Project", handler: () => setShowNewProject(true) });
     keyboard.register({ id: "settings", combo: "mod+,", description: "Settings", handler: () => setShowSettings(true) });
+
+    // Arrow keys nudge the selection: one unit, or a whole grid step with shift.
+    const arrows: Array<{ key: string; dx: number; dy: number }> = [
+      { key: "arrowleft", dx: -1, dy: 0 },
+      { key: "arrowright", dx: 1, dy: 0 },
+      { key: "arrowup", dx: 0, dy: -1 },
+      { key: "arrowdown", dx: 0, dy: 1 }
+    ];
+    for (const arrow of arrows) {
+      keyboard.register({
+        id: "nudge-" + arrow.key,
+        combo: arrow.key,
+        description: "Nudge selection",
+        handler: () => nudgeSelection(arrow.dx, arrow.dy)
+      });
+      keyboard.register({
+        id: "nudge-shift-" + arrow.key,
+        combo: "shift+" + arrow.key,
+        description: "Nudge selection by grid step",
+        handler: () => {
+          const step = Math.max(1, useEditorStore.getState().gridSize);
+          nudgeSelection(arrow.dx * step, arrow.dy * step);
+        }
+      });
+    }
+
     return () => {
       ["undo", "redo", "delete", "backspace", "duplicate", "copy", "cut", "paste", "newProject", "settings"].forEach(id => keyboard.unregister(id));
+      for (const arrow of arrows) {
+        keyboard.unregister("nudge-" + arrow.key);
+        keyboard.unregister("nudge-shift-" + arrow.key);
+      }
     };
-  }, [hasProject, deleteSelected, duplicateSelected, copySelection, cutSelection, paste]);
+  }, [hasProject, deleteSelected, duplicateSelected, copySelection, cutSelection, paste, nudgeSelection]);
 
   useEffect(() => {
     const platform = Container.resolve<PlatformService>(PlatformService.NAME);
@@ -220,8 +248,7 @@ export function App() {
       properties: { title: "Properties", content: <PropertiesPanel /> },
       textures: { title: "Textures", content: <TexturesPanel /> },
       bindings: { title: "Bindings", content: <BindingsPanel /> },
-      json: { title: "JSON UI", content: <JsonPreviewPanel /> },
-      history: { title: "History", content: <HistoryPanel /> }
+      json: { title: "JSON UI", content: <JsonPreviewPanel /> }
     }),
     []
   );
@@ -254,6 +281,7 @@ export function App() {
         onShowSettings={() => setShowSettings(true)}
         onShowAbout={() => setShowAbout(true)}
         onShowNewProject={() => setShowNewProject(true)}
+        onShowExportAddon={() => setShowExportAddon(true)}
         onCloseProject={() => Container.resolve<ProjectService>(ProjectService.NAME).close()}
       />
       <div className="jf-app__body">
@@ -263,6 +291,7 @@ export function App() {
       <NewProjectModal open={showNewProject} onClose={() => setShowNewProject(false)} />
       <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
       <AboutModal open={showAbout} onClose={() => setShowAbout(false)} />
+      <ExportAddonModal open={showExportAddon} onClose={() => setShowExportAddon(false)} />
     </div>
   );
 }

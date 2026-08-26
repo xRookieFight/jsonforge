@@ -5,6 +5,8 @@ import { useProjectStore } from "../../state/projectStore";
 import { ResolvedBox, computeBox } from "./anchorMath";
 import { ElementNode } from "../../core/element/ElementNode";
 import { useEditorStore } from "../../state/editorStore";
+import { dragPointer } from "./dragPointer";
+import { TEXTURE_MIME, TEXTURE_SLOTS, applyTexture } from "./textureDrop";
 
 interface Props {
   rootBox: ResolvedBox;
@@ -35,11 +37,15 @@ export function SelectionOverlay({ rootBox }: Props) {
   const setPropertyLive = useProjectStore(s => s.setPropertyLive);
   const commitPropertyBatch = useProjectStore(s => s.commitPropertyBatch);
   const zoom = useEditorStore(s => s.zoom);
+  const uiScale = useEditorStore(s => s.uiScale);
   const snapToGrid = useEditorStore(s => s.snapToGrid);
   const gridSize = useEditorStore(s => s.gridSize);
 
   const [box, setBox] = useState<ResolvedBox | null>(null);
   const [node, setNode] = useState<ElementNode | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  /** Left/top the dragged element started the gesture at, in units. */
+  const targetOrigin = useRef<[number, number]>([0, 0]);
 
   useEffect(() => {
     if (!primary) {
@@ -69,129 +75,125 @@ export function SelectionOverlay({ rootBox }: Props) {
     setBox(parentBox);
   }, [primary, version, rootBox]);
 
-  const startMove = (e: React.MouseEvent) => {
+  // Canvas pixels per UI unit while dragging: zoom and the game-like scale.
+  const pixelsPerUnit = zoom * uiScale;
+
+  const snap = (value: number): number => {
+    if (!snapToGrid || gridSize <= 0) return Math.round(value);
+    return Math.round(value / gridSize) * gridSize;
+  };
+
+  /**
+   * Preview of a gesture, painted straight onto the DOM.
+   *
+   * Pushing every pointer frame through the store re-renders the whole editor
+   * (tree, properties, JSON preview) sixty times a second, which is what made
+   * dragging feel heavy. During the gesture only the two boxes on screen move;
+   * the store gets one commit at the end.
+   */
+  const previewBox = (offsetDelta: [number, number], size: [number, number] | null): void => {
+    const shell = shellRef.current;
+    if (!shell || !box) return;
+    const target = shell.parentElement?.querySelector<HTMLElement>(`[data-element-id="${node?.id}"]`);
+
+    const left = box.x + offsetDelta[0];
+    const top = box.y + offsetDelta[1];
+    shell.style.left = `${left}px`;
+    shell.style.top = `${top}px`;
+    if (target) {
+      target.style.left = `${targetOrigin.current[0] + offsetDelta[0]}px`;
+      target.style.top = `${targetOrigin.current[1] + offsetDelta[1]}px`;
+    }
+
+    if (!size) return;
+    shell.style.width = `${size[0]}px`;
+    shell.style.height = `${size[1]}px`;
+    if (target) {
+      target.style.width = `${size[0]}px`;
+      target.style.height = `${size[1]}px`;
+    }
+    const handleOffset = 5 / pixelsPerUnit;
+    for (const element of shell.querySelectorAll<HTMLElement>(".jf-selection__handle")) {
+      const id = element.dataset.handle;
+      const handle = HANDLES.find(h => h.id === id);
+      if (!handle) continue;
+      element.style.left = `${handle.dx === -1 ? -handleOffset : handle.dx === 1 ? size[0] - handleOffset : size[0] / 2 - handleOffset}px`;
+      element.style.top = `${handle.dy === -1 ? -handleOffset : handle.dy === 1 ? size[1] - handleOffset : size[1] / 2 - handleOffset}px`;
+    }
+  };
+
+  const rememberTargetOrigin = (): void => {
+    const target = shellRef.current?.parentElement?.querySelector<HTMLElement>(
+      `[data-element-id="${node?.id}"]`
+    );
+    targetOrigin.current = target
+      ? [parseFloat(target.style.left || "0"), parseFloat(target.style.top || "0")]
+      : [0, 0];
+  };
+
+  const startMove = (e: React.PointerEvent) => {
     e.stopPropagation();
-    if (!node) return;
+    e.preventDefault();
+    if (!node || e.button !== 0) return;
+    const id = node.id;
     const origOffset = ((node.properties["offset"] as [number, number]) ?? [0, 0]).slice() as [number, number];
     const startX = e.clientX;
     const startY = e.clientY;
-    const id = node.id;
-    let lastOffset: [number, number] = origOffset;
-    let raf = 0;
-    let pendingEv: MouseEvent | null = null;
+    let last: [number, number] = origOffset;
+    rememberTargetOrigin();
 
-    const flush = () => {
-      raf = 0;
-      if (!pendingEv) return;
-      const ev = pendingEv;
-      pendingEv = null;
-      const dx = (ev.clientX - startX) / zoom;
-      const dy = (ev.clientY - startY) / zoom;
-      let nx = origOffset[0] + dx;
-      let ny = origOffset[1] + dy;
-      if (snapToGrid && gridSize > 0) {
-        nx = Math.round(nx / gridSize) * gridSize;
-        ny = Math.round(ny / gridSize) * gridSize;
+    dragPointer(e, {
+      move: ev => {
+        last = [
+          snap(origOffset[0] + (ev.clientX - startX) / pixelsPerUnit),
+          snap(origOffset[1] + (ev.clientY - startY) / pixelsPerUnit)
+        ];
+        previewBox([last[0] - origOffset[0], last[1] - origOffset[1]], null);
+      },
+      end: () => {
+        if (last[0] === origOffset[0] && last[1] === origOffset[1]) return;
+        // The gesture only painted the DOM; the value still has to reach the
+        // tree, otherwise the next render throws the move away.
+        setPropertyLive(id, "offset", last);
+        commitPropertyBatch([{ elementId: id, key: "offset", prev: origOffset, next: last }], "Move");
       }
-      lastOffset = [Math.round(nx), Math.round(ny)];
-      setPropertyLive(id, "offset", lastOffset);
-    };
-
-    const onMove = (ev: MouseEvent) => {
-      pendingEv = ev;
-      if (!raf) raf = requestAnimationFrame(flush);
-    };
-    const onUp = () => {
-      if (raf) cancelAnimationFrame(raf);
-      if (pendingEv) {
-        const ev = pendingEv;
-        pendingEv = null;
-        const dx = (ev.clientX - startX) / zoom;
-        const dy = (ev.clientY - startY) / zoom;
-        let nx = origOffset[0] + dx;
-        let ny = origOffset[1] + dy;
-        if (snapToGrid && gridSize > 0) {
-          nx = Math.round(nx / gridSize) * gridSize;
-          ny = Math.round(ny / gridSize) * gridSize;
-        }
-        lastOffset = [Math.round(nx), Math.round(ny)];
-        setPropertyLive(id, "offset", lastOffset);
-      }
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      if (lastOffset[0] !== origOffset[0] || lastOffset[1] !== origOffset[1]) {
-        commitPropertyBatch(
-          [{ elementId: id, key: "offset", prev: origOffset, next: lastOffset }],
-          "Move"
-        );
-      }
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    });
   };
 
-  const startResize = (e: React.MouseEvent, handle: Handle) => {
+  const startResize = (e: React.PointerEvent, handle: Handle) => {
     e.stopPropagation();
-    if (!node) return;
-    const origOffset = ((node.properties["offset"] as [number, number]) ?? [0, 0]).slice() as [number, number];
+    e.preventDefault();
+    if (!node || e.button !== 0) return;
+    const id = node.id;
     const origSize = ((node.properties["size"] as [number, number]) ?? [120, 40]).slice() as [number, number];
     const startX = e.clientX;
     const startY = e.clientY;
-    const id = node.id;
-    let lastSize: [number, number] = origSize;
-    let raf = 0;
-    let pendingEv: MouseEvent | null = null;
+    let last: [number, number] = origSize;
+    rememberTargetOrigin();
 
-    const compute = (ev: MouseEvent): [number, number] => {
-      const dx = (ev.clientX - startX) / zoom;
-      const dy = (ev.clientY - startY) / zoom;
-      let nw = origSize[0] + dx * handle.dx;
-      let nh = origSize[1] + dy * handle.dy;
-      nw = Math.max(4, nw);
-      nh = Math.max(4, nh);
-      if (snapToGrid && gridSize > 0) {
-        nw = Math.round(nw / gridSize) * gridSize;
-        nh = Math.round(nh / gridSize) * gridSize;
+    dragPointer(e, {
+      move: ev => {
+        const dx = ((ev.clientX - startX) / pixelsPerUnit) * handle.dx;
+        const dy = ((ev.clientY - startY) / pixelsPerUnit) * handle.dy;
+        last = [Math.max(1, snap(origSize[0] + dx)), Math.max(1, snap(origSize[1] + dy))];
+        previewBox([0, 0], last);
+      },
+      end: () => {
+        if (last[0] === origSize[0] && last[1] === origSize[1]) return;
+        setPropertyLive(id, "size", last);
+        commitPropertyBatch([{ elementId: id, key: "size", prev: origSize, next: last }], "Resize");
       }
-      return [Math.round(nw), Math.round(nh)];
-    };
-
-    const flush = () => {
-      raf = 0;
-      if (!pendingEv) return;
-      lastSize = compute(pendingEv);
-      pendingEv = null;
-      setPropertyLive(id, "size", lastSize);
-    };
-    const onMove = (ev: MouseEvent) => {
-      pendingEv = ev;
-      if (!raf) raf = requestAnimationFrame(flush);
-    };
-    const onUp = () => {
-      if (raf) cancelAnimationFrame(raf);
-      if (pendingEv) {
-        lastSize = compute(pendingEv);
-        pendingEv = null;
-        setPropertyLive(id, "size", lastSize);
-      }
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      if (lastSize[0] !== origSize[0] || lastSize[1] !== origSize[1]) {
-        commitPropertyBatch(
-          [{ elementId: id, key: "size", prev: origSize, next: lastSize }],
-          "Resize"
-        );
-      }
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    });
   };
 
   if (!box || !node) return null;
 
+  const handleSize = 10 / pixelsPerUnit;
+
   return (
     <div
       className="jf-selection"
+      ref={shellRef}
       style={{
         position: "absolute",
         left: box.x,
@@ -204,55 +206,63 @@ export function SelectionOverlay({ rootBox }: Props) {
       <div
         className="jf-selection__move"
         style={{ position: "absolute", inset: 0, pointerEvents: "auto", cursor: "move" }}
-        onMouseDown={startMove}
+        onPointerDown={startMove}
         onDragOver={e => {
-          if (node.typeId === "image" && e.dataTransfer.types.includes("application/jsonforge-texture")) {
+          if (TEXTURE_SLOTS[node.typeId] && e.dataTransfer.types.includes(TEXTURE_MIME)) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "copy";
           }
         }}
         onDrop={e => {
-          if (node.typeId !== "image") return;
-          const name = e.dataTransfer.getData("application/jsonforge-texture");
+          const key = TEXTURE_SLOTS[node.typeId];
+          if (!key) return;
+          const name = e.dataTransfer.getData(TEXTURE_MIME);
           if (!name) return;
           e.preventDefault();
           e.stopPropagation();
-          const prev = node.properties["texture"];
-          commitPropertyBatch(
-            [{ elementId: node.id, key: "texture", prev, next: name }],
-            "Set Texture"
-          );
+          applyTexture(node, key, name, setPropertyLive, commitPropertyBatch);
         }}
       />
       {HANDLES.map(handle => (
         <div
           key={handle.id}
           className={"jf-selection__handle jf-selection__handle--" + handle.id}
+          data-handle={handle.id}
           style={{
             position: "absolute",
-            width: 10,
-            height: 10,
+            width: handleSize,
+            height: handleSize,
             background: "var(--jf-accent)",
-            border: "1px solid #fff",
+            border: `${1 / pixelsPerUnit}px solid #fff`,
             pointerEvents: "auto",
             cursor: handle.cursor,
-            left: handle.dx === -1 ? -5 : handle.dx === 1 ? box.width - 5 : box.width / 2 - 5,
-            top: handle.dy === -1 ? -5 : handle.dy === 1 ? box.height - 5 : box.height / 2 - 5
+            left:
+              handle.dx === -1
+                ? -handleSize / 2
+                : handle.dx === 1
+                  ? box.width - handleSize / 2
+                  : box.width / 2 - handleSize / 2,
+            top:
+              handle.dy === -1
+                ? -handleSize / 2
+                : handle.dy === 1
+                  ? box.height - handleSize / 2
+                  : box.height / 2 - handleSize / 2
           }}
-          onMouseDown={e => startResize(e, handle)}
+          onPointerDown={e => startResize(e, handle)}
         />
       ))}
       <div
         className="jf-selection__info"
         style={{
           position: "absolute",
-          top: -22,
+          top: -22 / pixelsPerUnit,
           left: 0,
           background: "var(--jf-accent)",
-          color: "#000",
-          fontSize: 11,
-          padding: "1px 6px",
-          borderRadius: 3,
+          color: "var(--jf-accent-contrast)",
+          fontSize: 11 / pixelsPerUnit,
+          padding: `${1 / pixelsPerUnit}px ${6 / pixelsPerUnit}px`,
+          borderRadius: 3 / pixelsPerUnit,
           pointerEvents: "none",
           whiteSpace: "nowrap"
         }}

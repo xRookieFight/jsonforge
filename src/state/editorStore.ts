@@ -12,6 +12,8 @@ interface EditorState {
   showGrid: boolean;
   snapToGrid: boolean;
   gridSize: number;
+  /** Canvas pixels per JSON UI unit - the game draws the UI scaled up too. */
+  uiScale: number;
   showRulers: boolean;
   showOutlines: boolean;
   scale: number;
@@ -28,6 +30,7 @@ interface EditorState {
   toggleOutlines(): void;
   toggleRulers(): void;
   setGridSize(size: number): void;
+  setUiScale(scale: number): void;
   setScale(scale: number): void;
   setViewportBgColor(color: string): void;
   setViewportBgImage(url: string | null): void;
@@ -45,7 +48,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   panY: 0,
   showGrid: true,
   snapToGrid: false,
-  gridSize: 10,
+  gridSize: 4,
+  uiScale: 3,
   showRulers: true,
   showOutlines: true,
   scale: 1,
@@ -62,6 +66,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toggleOutlines: () => set(s => ({ showOutlines: !s.showOutlines })),
   toggleRulers: () => set(s => ({ showRulers: !s.showRulers })),
   setGridSize: size => set({ gridSize: Math.max(1, size) }),
+  setUiScale: scale => set({ uiScale: clamp(scale, 1, 8) }),
   setScale: scale => set({ scale }),
   setViewportBgColor: color => set({ viewportBgColor: color }),
   setViewportBgImage: url => set({ viewportBgImage: url }),

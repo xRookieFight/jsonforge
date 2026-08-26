@@ -9,8 +9,7 @@ export type DockId =
   | "properties"
   | "textures"
   | "bindings"
-  | "json"
-  | "history";
+  | "json";
 
 interface Props {
   panels: Record<DockId, { title: string; content: ReactNode }>;

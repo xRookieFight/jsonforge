@@ -17,8 +17,12 @@ export function JsonPreviewPanel() {
       setText("{}");
       return;
     }
-    const result = exporter.export(project.getMeta().namespace, project.getRoot());
-    setText(result.text);
+    // Serializing the whole tree into Monaco on every version bump would run
+    // once per frame while dragging; the preview can lag a moment behind.
+    const timer = setTimeout(() => {
+      setText(exporter.export(project.getMeta().namespace, project.getRoot()).text);
+    }, 150);
+    return () => clearTimeout(timer);
   }, [version, exporter]);
 
   const copy = () => navigator.clipboard.writeText(text).catch(() => undefined);

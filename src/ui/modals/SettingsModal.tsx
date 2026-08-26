@@ -9,6 +9,8 @@ interface Props {
 export function SettingsModal({ open, onClose }: Props) {
   const gridSize = useEditorStore(s => s.gridSize);
   const setGridSize = useEditorStore(s => s.setGridSize);
+  const uiScale = useEditorStore(s => s.uiScale);
+  const setUiScale = useEditorStore(s => s.setUiScale);
   const showGrid = useEditorStore(s => s.showGrid);
   const toggleGrid = useEditorStore(s => s.toggleGrid);
   const snapToGrid = useEditorStore(s => s.snapToGrid);
@@ -28,6 +30,18 @@ export function SettingsModal({ open, onClose }: Props) {
             step={1}
             value={gridSize}
             onChange={e => setGridSize(Number(e.target.value))}
+          />
+        </div>
+        <div className="jf-form__row">
+          <label title="Canvas pixels per JSON UI unit - the game scales the UI up too">Canvas Scale</label>
+          <input
+            className="jf-input"
+            type="number"
+            min={1}
+            max={8}
+            step={1}
+            value={uiScale}
+            onChange={e => setUiScale(Number(e.target.value))}
           />
         </div>
         <div className="jf-form__row">

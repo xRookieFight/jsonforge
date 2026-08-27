@@ -4,6 +4,37 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioned with
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-08-27
+
+### Fixed
+
+* Exported forms cover the whole screen. The vanilla `long_form` inherits a
+  fixed 260x210 dialog and the screen kept instantiating it through its own
+  factory, so a drawn layout measured its percentages against that box instead
+  of the display and came out a fraction of its intended size. The pack now
+  ships a full-screen screen content of its own.
+* Preset textures are stored as 8-bit RGBA. Forty-four of them were RGB or
+  palette PNGs, which Bedrock's UI loader rejects - they were drawn as the
+  missing-texture pattern.
+* Labels are drawn where the canvas puts them. JSON UI draws label text from
+  the top of the control while the editor centres it in the drawn box, so
+  every label sat high in game.
+* A button with an icon drops its caption, and the icon covers the button edge
+  to edge instead of leaving the background showing as a border.
+
+### Added
+
+* Form buttons are filled by the script. Buttons drawn under one parent are
+  read as a table and exported as a single grid over the `form_buttons`
+  collection, so `form.button(...)` decides how many there are - draw a 2x2 and
+  send three, and the fourth place is never built.
+* Labels can be wired to `form_title`. The generated script sends a display
+  title after the routing flag and the label subtracts the flag back out.
+* Exported forms get a close button in the top right corner of the drawn body.
+* **Install to World**. The desktop app lists the Minecraft worlds on this
+  machine and writes the built pack straight into one of them, replacing the
+  pack folder and updating the world's pack lists - no file to import by hand.
+
 ## [0.2.0] - 2026-08-26
 
 ### Added
@@ -113,7 +144,8 @@ All notable changes to this project are documented here. Format based on
   button, input_panel, toggle, custom), per-element property schema,
   bindings, undo/redo, JSON UI import/export, presets, Electron + web build.
 
-[Unreleased]: https://github.com/jfbedrock/jsonforge/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/jfbedrock/jsonforge/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/jfbedrock/jsonforge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jfbedrock/jsonforge/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jfbedrock/jsonforge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jfbedrock/jsonforge/releases/tag/v0.1.0

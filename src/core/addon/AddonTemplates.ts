@@ -352,7 +352,8 @@ export function hudScreenTemplate(routes: ScreenRoute[]): string {
  * Builds `ui/server_form.json`.
  *
  * The file carries the name of a vanilla screen, so it REPLACES the original
- * entirely. It does one thing: routing. For each screen it shows that screen's
+ * entirely. It does two things: it hands the form the whole display instead of
+ * the vanilla dialog box, and it routes. For each screen it shows that screen's
  * panel when the form title contains the screen name - the string subtraction
  * trick of JSON UI.
  *
@@ -376,10 +377,44 @@ export function serverFormTemplate(routes: ScreenRoute[]): string {
 
   const doc = {
     namespace: "server_form",
+
+    // Redefining `long_form` alone is not enough: the vanilla one inherits
+    // `common_dialogs.main_panel_no_buttons`, a fixed 260x210 dialog, and the
+    // screen keeps instantiating it through its own factory. The drawn layout
+    // then measures its percentages against that box instead of the display
+    // and comes out a fraction of the intended size. Sending the screen at a
+    // content panel of our own drops the dialog frame for good.
+    "third_party_server_screen@common.base_screen": {
+      $screen_content: "server_form.jsonforge_screen_content"
+    },
+
+    jsonforge_screen_content: {
+      type: "panel",
+      size: ["100%", "100%"],
+      controls: [
+        {
+          server_form_factory: {
+            type: "factory",
+            control_ids: {
+              long_form: "@server_form.long_form",
+              custom_form: "@server_form.custom_form"
+            }
+          }
+        }
+      ]
+    },
+
     long_form: {
       type: "panel",
       size: ["100%", "100%"],
       controls
+    },
+
+    // The factory names both forms, and this file replaces the vanilla one, so
+    // the modal has to be declared here as well or the reference dangles and
+    // the screen fails to build. It keeps the vanilla dialog.
+    "custom_form@common_dialogs.main_panel_no_buttons": {
+      size: [260, 210]
     }
   };
 

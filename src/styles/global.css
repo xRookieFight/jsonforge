@@ -1549,3 +1549,44 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 .jf-properties__scale span { flex: 1; }
 .jf-properties__scale input { width: 62px; }
+
+.jf-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--jf-panel-bg, #2a2a30);
+  border: 1px solid var(--jf-border, #3a3a42);
+  border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.jf-context-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.jf-context-menu__item:hover {
+  background: var(--jf-accent, #4a90e2);
+}
+
+.jf-context-menu__hint {
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.jf-context-menu__item:hover .jf-context-menu__hint {
+  opacity: 0.85;
+}
+
+.jf-context-menu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--jf-border, #3a3a42);
+}

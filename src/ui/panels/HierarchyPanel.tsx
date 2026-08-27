@@ -9,6 +9,16 @@ import { iconForElement } from "../icons/elementIcons";
 
 type DropZone = "before" | "into" | "after";
 
+/**
+ * Row being dragged, kept outside React on purpose.
+ *
+ * `dataTransfer` only hands its payload back on drop, so a row being dragged
+ * over cannot ask what is coming. Without it every row lights up, including
+ * the ones inside the dragged element - which the move then refuses, leaving
+ * the drop looking broken.
+ */
+let dragging: string | null = null;
+
 export function HierarchyPanel() {
   const version = useProjectStore(s => s.version);
   const selection = useProjectStore(s => s.selection);
@@ -21,6 +31,9 @@ export function HierarchyPanel() {
   const paste = useProjectStore(s => s.paste);
   const deleteSelected = useProjectStore(s => s.deleteSelected);
   const duplicateSelected = useProjectStore(s => s.duplicateSelected);
+  const moveOut = useProjectStore(s => s.moveOut);
+  const groupSelection = useProjectStore(s => s.groupSelection);
+  const ungroupNode = useProjectStore(s => s.ungroupNode);
 
   const [root, setRoot] = useState<ElementNode | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
@@ -43,6 +56,8 @@ export function HierarchyPanel() {
 
   if (!root) return <div className="jf-panel jf-hierarchy">No project.</div>;
 
+  const target = menu ? root.findById(menu.nodeId) : null;
+
   return (
     <div className="jf-panel jf-hierarchy">
       <TreeRow
@@ -63,41 +78,40 @@ export function HierarchyPanel() {
       {menu && (
         <div
           className="jf-context-menu"
-          style={{
-            position: "fixed",
-            left: menu.x,
-            top: menu.y,
-            background: "var(--jf-panel-bg, #2a2a30)",
-            border: "1px solid var(--jf-border, #3a3a42)",
-            borderRadius: 4,
-            padding: 4,
-            zIndex: 1000,
-            minWidth: 160,
-            boxShadow: "0 6px 20px rgba(0,0,0,0.4)"
-          }}
+          style={{ left: menu.x, top: menu.y }}
           onClick={e => e.stopPropagation()}
         >
-          <MenuItem label="Copy  Ctrl+C" onClick={() => { copySelection(); setMenu(null); }} />
-          <MenuItem label="Cut  Ctrl+X" onClick={() => { cutSelection(); setMenu(null); }} />
-          <MenuItem label="Paste  Ctrl+V" onClick={() => { paste(); setMenu(null); }} />
-          <MenuItem label="Duplicate  Ctrl+D" onClick={() => { duplicateSelected(); setMenu(null); }} />
-          <MenuItem label="Delete  Del" onClick={() => { deleteSelected(); setMenu(null); }} />
+          {target?.parent?.parent && (
+            <MenuItem
+              label="Move Out of Panel"
+              hint={`to ${target.parent.parent.name}`}
+              onClick={() => { moveOut(menu.nodeId); setMenu(null); }}
+            />
+          )}
+          {target && target.parent && (
+            <MenuItem label="Group into Panel" onClick={() => { groupSelection(); setMenu(null); }} />
+          )}
+          {target && target.parent && target.children.length > 0 && (
+            <MenuItem label="Ungroup" onClick={() => { ungroupNode(menu.nodeId); setMenu(null); }} />
+          )}
+          <div className="jf-context-menu__sep" />
+          <MenuItem label="Copy" hint="Ctrl+C" onClick={() => { copySelection(); setMenu(null); }} />
+          <MenuItem label="Cut" hint="Ctrl+X" onClick={() => { cutSelection(); setMenu(null); }} />
+          <MenuItem label="Paste" hint="Ctrl+V" onClick={() => { paste(); setMenu(null); }} />
+          <MenuItem label="Duplicate" hint="Ctrl+D" onClick={() => { duplicateSelected(); setMenu(null); }} />
+          <div className="jf-context-menu__sep" />
+          <MenuItem label="Delete" hint="Del" onClick={() => { deleteSelected(); setMenu(null); }} />
         </div>
       )}
     </div>
   );
 }
 
-function MenuItem({ label, onClick }: { label: string; onClick(): void }) {
+function MenuItem({ label, hint, onClick }: { label: string; hint?: string; onClick(): void }) {
   return (
-    <div
-      className="jf-context-menu__item"
-      style={{ padding: "4px 10px", cursor: "pointer", fontSize: 12, borderRadius: 3 }}
-      onMouseEnter={e => (e.currentTarget.style.background = "var(--jf-accent, #4a90e2)")}
-      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-      onClick={onClick}
-    >
-      {label}
+    <div className="jf-context-menu__item" onClick={onClick}>
+      <span>{label}</span>
+      {hint && <span className="jf-context-menu__hint">{hint}</span>}
     </div>
   );
 }
@@ -123,6 +137,9 @@ function TreeRow({ node, parent, depth, selection, onSelect, onRename, onMove, o
   const isSelected = selection.includes(node.id);
   const hasChildren = node.children.length > 0;
   const acceptsChildren = !!meta?.acceptsChildren;
+
+  // A node cannot be dropped inside itself: the move would build a cycle.
+  const accepts = !dragging || !node.path().some(step => step.id === dragging);
 
   const computeZone = (e: React.DragEvent): DropZone => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -151,16 +168,24 @@ function TreeRow({ node, parent, depth, selection, onSelect, onRename, onMove, o
         onContextMenu={e => onContextMenu(e, node.id)}
         draggable
         onDragStart={e => {
+          dragging = node.id;
           e.dataTransfer.setData("text/plain", node.id);
           e.dataTransfer.effectAllowed = "move";
         }}
+        onDragEnd={() => {
+          dragging = null;
+          setZone(null);
+        }}
         onDragOver={e => {
+          if (!accepts) return;
           e.preventDefault();
           setZone(computeZone(e));
         }}
         onDragLeave={() => setZone(null)}
         onDrop={e => {
           e.preventDefault();
+          dragging = null;
+          if (!accepts) return;
           const id = e.dataTransfer.getData("text/plain");
           const z = computeZone(e);
           setZone(null);

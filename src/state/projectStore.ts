@@ -7,6 +7,7 @@ import { ProjectService } from "../core/services/ProjectService";
 import { SelectionService } from "../core/services/SelectionService";
 import { HistoryService } from "../core/services/HistoryService";
 import { PropertyValue } from "../core/property/base/PropertyType";
+import { ResolvedBox, computeBox } from "../ui/canvas/anchorMath";
 
 interface ProjectStoreState {
   version: number;
@@ -34,12 +35,57 @@ interface ProjectStoreState {
   reorderChild(parentId: string, childId: string, newIndex: number): void;
   reparent(elementId: string, newParentId: string, index?: number): void;
   moveNode(elementId: string, newParentId: string, index: number): void;
+  moveOut(elementId: string): void;
+  groupSelection(): void;
+  ungroupNode(elementId: string): void;
   copySelection(): void;
   cutSelection(): void;
   paste(): void;
   hasClipboard(): boolean;
   setNamespace(ns: string): void;
   nudgeSelection(dx: number, dy: number): void;
+}
+
+const selectionOf = () => Container.resolve<SelectionService>(SelectionService.NAME);
+
+function sizeOf(node: ElementNode): [number, number] {
+  return (node.properties["size"] as [number, number]) ?? [120, 40];
+}
+
+function offsetOf(node: ElementNode): [number, number] {
+  return (node.properties["offset"] as [number, number]) ?? [0, 0];
+}
+
+function anchorsOf(node: ElementNode): [string, string] {
+  return [
+    (node.properties["anchor_from"] as string) ?? "center",
+    (node.properties["anchor_to"] as string) ?? "center"
+  ];
+}
+
+/** Where a node actually sits, walking the anchors down from the root. */
+function absoluteBox(node: ElementNode): ResolvedBox {
+  const path = node.path();
+  let current: ResolvedBox = { x: 0, y: 0, width: sizeOf(path[0])[0], height: sizeOf(path[0])[1] };
+  for (let i = 1; i < path.length; i++) {
+    const [from, to] = anchorsOf(path[i]);
+    current = computeBox(current, sizeOf(path[i]), offsetOf(path[i]), from, to);
+  }
+  return current;
+}
+
+/**
+ * The offset that puts a node at a given place inside a given parent.
+ *
+ * Reparenting cannot carry the offset over: the number is measured from the
+ * anchors of whatever contains the node, so the same offset lands somewhere
+ * else under a new parent. Measuring the neutral position first turns "keep it
+ * where it is" into a plain difference.
+ */
+function offsetWithin(node: ElementNode, parent: ResolvedBox, target: ResolvedBox): [number, number] {
+  const [from, to] = anchorsOf(node);
+  const neutral = computeBox(parent, sizeOf(node), [0, 0], from, to);
+  return [Math.round(target.x - neutral.x), Math.round(target.y - neutral.y)];
 }
 
 const clipboard: { items: ElementNodeData[] } = { items: [] };
@@ -355,6 +401,146 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         project.markDirty();
       }
     });
+    get().refreshFromServices();
+  },
+
+  /**
+   * Lifts a node out of its parent, into the parent above it.
+   *
+   * Dragging a row onto the thin edge strip of another is the only other way
+   * to do this, and it is a poor target - one that is not even there when the
+   * element is alone in its panel.
+   */
+  moveOut: elementId => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const node = project.getRoot().findById(elementId);
+    const parent = node?.parent;
+    const grandparent = parent?.parent;
+    if (!node || !parent || !grandparent) return;
+
+    const where = absoluteBox(node);
+    const prevOffset = offsetOf(node);
+    const prevIndex = parent.children.indexOf(node);
+    const targetIndex = grandparent.children.indexOf(parent) + 1;
+
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.execute({
+      label: "Move Out",
+      apply: () => {
+        parent.removeChild(node);
+        grandparent.addChild(node, targetIndex);
+        node.properties["offset"] = offsetWithin(node, absoluteBox(grandparent), where);
+        project.markDirty();
+      },
+      revert: () => {
+        grandparent.removeChild(node);
+        parent.addChild(node, prevIndex);
+        node.properties["offset"] = prevOffset;
+        project.markDirty();
+      }
+    });
+    get().refreshFromServices();
+  },
+
+  /** Wraps the selected siblings in a panel drawn around them. */
+  groupSelection: () => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const selection = Container.resolve<SelectionService>(SelectionService.NAME);
+    const root = project.getRoot();
+
+    const nodes = selection
+      .ids()
+      .map(id => root.findById(id))
+      .filter((node): node is ElementNode => !!node && !!node.parent);
+    if (nodes.length === 0) return;
+
+    const parent = nodes[0].parent!;
+    if (nodes.some(node => node.parent !== parent)) return;
+
+    const boxes = nodes.map(absoluteBox);
+    const left = Math.min(...boxes.map(b => b.x));
+    const top = Math.min(...boxes.map(b => b.y));
+    const width = Math.max(...boxes.map(b => b.x + b.width)) - left;
+    const height = Math.max(...boxes.map(b => b.y + b.height)) - top;
+
+    const type = ElementRegistry.get().get("panel");
+    if (!type) return;
+    const group = new ElementNode("panel", "group_" + nanoid(4), { ...type.schema().defaults() });
+    group.properties["size"] = [Math.round(width), Math.round(height)];
+    group.properties["anchor_from"] = "center";
+    group.properties["anchor_to"] = "center";
+
+    const index = Math.min(...nodes.map(node => parent.children.indexOf(node)));
+    const previous = nodes.map(node => ({
+      node,
+      index: parent.children.indexOf(node),
+      offset: offsetOf(node)
+    }));
+
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.execute({
+      label: "Group",
+      apply: () => {
+        for (const { node } of previous) parent.removeChild(node);
+        parent.addChild(group, index);
+        group.properties["offset"] = offsetWithin(group, absoluteBox(parent), { x: left, y: top, width, height });
+        const inside = absoluteBox(group);
+        for (let i = 0; i < previous.length; i++) {
+          group.addChild(previous[i].node);
+          previous[i].node.properties["offset"] = offsetWithin(previous[i].node, inside, boxes[i]);
+        }
+        project.markDirty();
+      },
+      revert: () => {
+        for (const { node } of previous) group.removeChild(node);
+        parent.removeChild(group);
+        for (const entry of [...previous].sort((a, b) => a.index - b.index)) {
+          parent.addChild(entry.node, entry.index);
+          entry.node.properties["offset"] = entry.offset;
+        }
+        project.markDirty();
+      }
+    });
+    selection.select(group.id);
+    get().refreshFromServices();
+  },
+
+  /** Dissolves a container, leaving its children where they were drawn. */
+  ungroupNode: elementId => {
+    const project = Container.resolve<ProjectService>(ProjectService.NAME);
+    const group = project.getRoot().findById(elementId);
+    const parent = group?.parent;
+    if (!group || !parent || group.children.length === 0) return;
+
+    const children = [...group.children];
+    const boxes = children.map(absoluteBox);
+    const previous = children.map(node => ({ node, offset: offsetOf(node) }));
+    const groupIndex = parent.children.indexOf(group);
+
+    const history = Container.resolve<HistoryService>(HistoryService.NAME);
+    history.execute({
+      label: "Ungroup",
+      apply: () => {
+        for (const child of children) group.removeChild(child);
+        parent.removeChild(group);
+        const outside = absoluteBox(parent);
+        for (let i = 0; i < children.length; i++) {
+          parent.addChild(children[i], groupIndex + i);
+          children[i].properties["offset"] = offsetWithin(children[i], outside, boxes[i]);
+        }
+        project.markDirty();
+      },
+      revert: () => {
+        for (const child of children) parent.removeChild(child);
+        parent.addChild(group, groupIndex);
+        for (const entry of previous) {
+          group.addChild(entry.node);
+          entry.node.properties["offset"] = entry.offset;
+        }
+        project.markDirty();
+      }
+    });
+    selectionOf().selectMany(children.map(child => child.id));
     get().refreshFromServices();
   },
 

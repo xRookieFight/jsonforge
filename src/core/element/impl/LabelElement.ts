@@ -34,7 +34,7 @@ export class LabelElement extends ElementType {
         kind: "enum",
         group: "Scoreboard",
         default: "none",
-        options: ["none", "objective_title", "player_name", "player_score"]
+        options: ["none", "form_title", "objective_title", "player_name", "player_score"]
       })
       .add({ key: "sb_index", label: "Row Index", kind: "number", group: "Scoreboard", default: 0, min: 0, step: 1 });
 

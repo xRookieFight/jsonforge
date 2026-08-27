@@ -28,7 +28,21 @@ export interface ScriptOptions {
 
 export interface ScreenScriptData {
   flag: string;
+  /**
+   * What the player reads. The form title carries the routing flag first and
+   * this after it, so a label wired to the title subtracts the flag and is
+   * left with exactly this text.
+   */
+  title: string;
   buttons: Array<{ text: string; icon?: string; action: ButtonAction }>;
+}
+
+/** A screen name into something worth putting on the screen: `hub_form` -> `Hub Form`. */
+function displayTitle(name: string): string {
+  return name
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .replace(/\S+/g, word => word[0].toUpperCase() + word.slice(1));
 }
 
 /** Escapes a string so it fits between double quotes in the generated code. */
@@ -62,7 +76,7 @@ export function describeScreens(screens: AddonScreen[], options: ScriptOptions):
     // spare one: no JSON UI control points at that index, but the form exists.
     if (buttons.length === 0) buttons.push({ text: "Close", action: { type: "none" } });
 
-    return { flag: sanitizeFlag(screen.name), buttons };
+    return { flag: sanitizeFlag(screen.name), title: displayTitle(screen.name), buttons };
   });
 }
 
@@ -87,7 +101,7 @@ function screensLiteral(data: ScreenScriptData[]): string {
         return `            { ${fields.join(", ")} },`;
       })
       .join("\n");
-    return `    ${quote(screen.flag)}: {\n        buttons: [\n${buttons}\n        ],\n    },`;
+    return `    ${quote(screen.flag)}: {\n        title: ${quote(screen.title)},\n        buttons: [\n${buttons}\n        ],\n    },`;
   });
   return `{\n${entries.join("\n")}\n}`;
 }
@@ -192,7 +206,9 @@ function showScreen(player, name) {
         return;
     }
 
-    const form = new ActionFormData().title(name);
+    // The flag routes, the title is read: server_form.json looks for the name
+    // inside the title and the screen's own label subtracts it back out.
+    const form = new ActionFormData().title(name + screen.title);
     for (const button of screen.buttons) {
         const label = fillScores(player, button.text);
         if (button.icon) form.button(label, button.icon);

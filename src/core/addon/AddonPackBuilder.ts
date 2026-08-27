@@ -92,7 +92,10 @@ export class AddonPackBuilder {
         resolveTexture: collector.resolve,
         omitControlNineslice: true,
         scaleMode: scoreboard ? "absolute" : options.scaleMode ?? "fit",
-        fillParent: scoreboard
+        fillParent: scoreboard,
+        titleFlag: sanitizeFlag(screen.name),
+        // Only a form is a screen the player opens and has to get out of.
+        closeButton: !hud && !scoreboard
       });
 
       const path = `ui/${packNamespace}/${namespace}.json`;

@@ -77,6 +77,19 @@ export function buttonFaceTemplate(): JsonUiNode {
               binding_name: "#form_button_text",
               binding_type: "collection",
               binding_collection_name: FORM_BUTTON_COLLECTION
+            },
+            {
+              binding_name: "#form_button_texture",
+              binding_name_override: "#texture",
+              binding_type: "collection",
+              binding_collection_name: FORM_BUTTON_COLLECTION
+            },
+            // An icon covers the whole button, so the caption would sit on top
+            // of the artwork. The button that has one drops its text.
+            {
+              binding_type: "view",
+              source_property_name: "((#texture = '') or (#texture = 'loading'))",
+              target_property_name: "#visible"
             }
           ]
         }
@@ -145,6 +158,126 @@ export function customButtonTemplate(namespace: string): JsonUiNode {
         binding_type: "view",
         source_property_name: "(not (#form_button_text = ''))",
         target_property_name: "#visible"
+      }
+    ]
+  };
+}
+
+/** Share of the close button the coloured fill takes, leaving a black frame. */
+const CLOSE_BUTTON_FILL = "94%";
+
+/** The three states a close button is drawn in, from its resting colour. */
+export interface CloseButtonColours {
+  default: [number, number, number];
+  hover: [number, number, number];
+  pressed: [number, number, number];
+}
+
+/**
+ * The close button, in the top right corner of the drawn body.
+ *
+ * A `button` picks one of its `default`/`hover`/`pressed` children by state,
+ * which is what gives the hover - an image on its own cannot see the pointer.
+ * The look is vanilla white tinted per state rather than artwork of its own:
+ * the close button is the one control the editor never draws, so shipping a
+ * texture for it would put a file in every pack for a flat colour.
+ *
+ * `button.menu_exit` is the event the vanilla close button sends, so the form
+ * closes the same way and the script never hears about it.
+ */
+export function closeButtonTemplate(size: [string, string], offset: [string, string], colours: CloseButtonColours): JsonUiNode {
+  const face = (colour: [number, number, number]): JsonUiNode => ({
+    type: "panel",
+    size: ["100%", "100%"],
+    controls: [
+      // The frame is the bottom layer showing through: the fill sits on top of
+      // it inset on every side, which is cheaper than a nine-sliced border and
+      // needs no artwork.
+      { border: { type: "image", size: ["100%", "100%"], texture: "textures/ui/White", color: [0, 0, 0], layer: 0 } },
+      {
+        fill: {
+          type: "image",
+          size: [CLOSE_BUTTON_FILL, CLOSE_BUTTON_FILL],
+          anchor_from: "center",
+          anchor_to: "center",
+          texture: "textures/ui/White",
+          color: colour,
+          layer: 1
+        }
+      },
+      {
+        glyph: {
+          type: "label",
+          text: "X",
+          localize: false,
+          size: ["100%", "default"],
+          anchor_from: "center",
+          anchor_to: "center",
+          text_alignment: "center",
+          font_scale_factor: 1.8,
+          color: [1, 1, 1],
+          layer: 2
+        }
+      }
+    ]
+  });
+
+  return {
+    type: "button",
+    size,
+    anchor_from: "top_right",
+    anchor_to: "top_right",
+    offset,
+    // Above the drawn artwork, which sits on the layers the editor assigns.
+    layer: 20,
+    default_control: "default",
+    hover_control: "hover",
+    pressed_control: "pressed",
+    button_mappings: [
+      {
+        from_button_id: "button.menu_select",
+        to_button_id: "button.menu_exit",
+        mapping_type: "pressed"
+      }
+    ],
+    controls: [
+      { default: face(colours.default) },
+      { hover: face(colours.hover) },
+      { pressed: face(colours.pressed) }
+    ]
+  };
+}
+
+/**
+ * One cell of the form button grid.
+ *
+ * The grid gives every cell the same box and feeds it its own collection
+ * index, so the button inside needs neither an index nor an offset - only the
+ * share of the cell the drawn button covered, which is what keeps the gaps of
+ * the design.
+ */
+export function formButtonCellTemplate(
+  namespace: string,
+  cellName: string,
+  cell: [string, string],
+  slot: [string, string],
+  button: JsonUiNode
+): JsonUiNode {
+  return {
+    type: "panel",
+    // A share of the grid, not of a cell: the template carries its own box and
+    // the grid only decides where it goes. "100%" here would make every cell
+    // as wide as the whole grid, which puts one button on each row.
+    size: cell,
+    controls: [
+      {
+        [`${cellName}_slot`]: {
+          type: "panel",
+          size: slot,
+          anchor_from: "center",
+          anchor_to: "center",
+          controls: [{ [`${cellName}_button@${namespace}.custom_button`]: button }]
+        }
       }
     ]
   };

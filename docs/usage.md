@@ -53,6 +53,53 @@ export is resource pack only. Double-click the file, then enable the pack in
 the world (or under Settings > Global Resources for servers) and move it to the
 top of the list.
 
+A form covers the whole screen, not the vanilla dialog box, and gets a close
+button in the top right corner of its outermost panel. You do not draw that
+one - it is added on export.
+
+## 3.1 Buttons the script fills
+
+Form buttons are not fixed to the drawing. The buttons you draw under one
+parent are read as a table - their centres give the columns and rows, their
+bounding box gives the area - and exported as a single grid over the
+`form_buttons` collection.
+
+The script then decides how many there are. Draw four in a 2x2 and send three
+from `form.button(...)`: the first three places are filled and the fourth is
+never built. Send one and you get one, in the top left place.
+
+Two things follow from this:
+
+- Every button is drawn from the **first** one you drew. A grid paints all its
+  cells the same, so per-button textures and fonts are not kept - style the
+  first button and the rest follow.
+- The drawing sets the capacity. A 2x2 holds four; a fifth button sent from the
+  script has nowhere to go. Draw the largest table you need.
+
+Draw a single button and none of this applies - it stays exactly where it is,
+bound to its own index.
+
+## 3.2 Titles from the script
+
+The form title does double duty: it routes to the screen *and* it is text you
+can show. The generated `main.js` sends both:
+
+```js
+const SCREENS = {
+    "hub_form": {
+        title: "Hub Form",
+        buttons: [ ... ],
+    },
+}
+
+const form = new ActionFormData().title(name + screen.title);
+```
+
+`server_form.json` looks for the screen name inside the title, and a label
+wired to `form_title` subtracts it back out - so the player reads `Hub Form`
+and never sees the flag. Change the `title:` line to change what is drawn; the
+flag in front of it has to stay.
+
 ## 4. Make text live
 
 Static labels are drawn exactly as designed. To show real values, wire a label
@@ -60,6 +107,7 @@ to the game in **Properties > Scoreboard**:
 
 | Live Value | Comes from |
 | --- | --- |
+| `form_title` | What the script passed to `form.title(...)` on a form screen |
 | `objective_title` | The display name of the objective on the sidebar |
 | `player_name` | Row *N* of the sidebar, name column |
 | `player_score` | Row *N* of the sidebar, score column |

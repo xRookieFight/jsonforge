@@ -12,7 +12,15 @@ const bridge = {
     readdir: (path: string): Promise<Array<{ name: string; isDirectory: boolean; isFile: boolean }>> =>
       ipcRenderer.invoke("fs:readdir", path),
     stat: (path: string): Promise<{ size: number; mtimeMs: number; isDir: boolean }> =>
-      ipcRenderer.invoke("fs:stat", path)
+      ipcRenderer.invoke("fs:stat", path),
+    writeBinaryFile: (path: string, data: Uint8Array): Promise<void> =>
+      ipcRenderer.invoke("fs:writeBinaryFile", path, data),
+    rm: (path: string): Promise<void> => ipcRenderer.invoke("fs:rm", path)
+  },
+
+  worlds: {
+    list: (): Promise<Array<{ path: string; name: string; folder: string }>> =>
+      ipcRenderer.invoke("worlds:list")
   },
 
   dialog: {

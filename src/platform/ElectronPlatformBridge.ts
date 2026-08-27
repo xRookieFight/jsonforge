@@ -1,4 +1,4 @@
-import { DirectoryHandle, FileFilter, FileHandle, MenuChannel, PlatformBridge } from "./PlatformBridge";
+import { DirectoryHandle, FileFilter, FileHandle, MenuChannel, MinecraftWorld, PlatformBridge } from "./PlatformBridge";
 
 export class ElectronPlatformBridge implements PlatformBridge {
   public readonly id = "electron" as const;
@@ -44,5 +44,28 @@ export class ElectronPlatformBridge implements PlatformBridge {
 
   public onMenu(channel: MenuChannel, handler: () => void): () => void {
     return this.api().menu.on(channel, handler);
+  }
+
+  public async listWorlds(): Promise<MinecraftWorld[]> {
+    return await this.api().worlds.list();
+  }
+
+  public async writePath(path: string, data: Uint8Array | string): Promise<void> {
+    const folder = path.replace(/[\\/][^\\/]*$/, "");
+    if (folder && folder !== path) await this.api().fs.mkdir(folder);
+    if (typeof data === "string") await this.api().fs.writeFile(path, data);
+    else await this.api().fs.writeBinaryFile(path, data);
+  }
+
+  public async removePath(path: string): Promise<void> {
+    await this.api().fs.rm(path);
+  }
+
+  public async readPath(path: string): Promise<string | null> {
+    try {
+      return await this.api().fs.readFile(path, "utf-8");
+    } catch {
+      return null;
+    }
   }
 }

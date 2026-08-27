@@ -7,6 +7,10 @@ interface JsonForgeApi {
     mkdir(path: string): Promise<void>;
     readdir(path: string): Promise<Array<{ name: string; isDirectory: boolean; isFile: boolean }>>;
     stat(path: string): Promise<{ size: number; mtimeMs: number; isDir: boolean }>;
+    rm(path: string): Promise<void>;
+  };
+  worlds: {
+    list(): Promise<Array<{ path: string; name: string; folder: string }>>;
   };
   dialog: {
     openFile(filters?: Array<{ name: string; extensions: string[] }>): Promise<string | null>;

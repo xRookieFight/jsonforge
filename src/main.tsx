@@ -17,6 +17,7 @@ import { KeyboardService } from "./core/services/KeyboardService";
 import { FileService } from "./core/services/FileService";
 import { AutoSaveService } from "./core/services/AutoSaveService";
 import { AddonExportService } from "./core/services/AddonExportService";
+import { WorldInstallService } from "./core/services/WorldInstallService";
 
 async function bootstrap(): Promise<void> {
   ElementBootstrap.registerDefaults();
@@ -32,7 +33,8 @@ async function bootstrap(): Promise<void> {
     new KeyboardService(),
     new FileService(),
     new AutoSaveService(),
-    new AddonExportService()
+    new AddonExportService(),
+    new WorldInstallService()
   ]);
 
   ReactDOM.createRoot(document.getElementById("root")!).render(

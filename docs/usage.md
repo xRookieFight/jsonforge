@@ -57,6 +57,16 @@ A form covers the whole screen, not the vanilla dialog box, and gets a close
 button in the top right corner of its outermost panel. You do not draw that
 one - it is added on export.
 
+### Straight into a world
+
+The desktop app lists the worlds it finds on this machine under **Test World**.
+**Install to World** builds the same pack and writes it into that world's own
+`resource_packs` and `behavior_packs` folders, adding it to the world's pack
+lists - no file to save and import by hand.
+
+Restart the game afterwards: JSON UI files and pack textures are read when the
+world loads, so a running game keeps showing the previous build.
+
 ## 3.1 Buttons the script fills
 
 Form buttons are not fixed to the drawing. The buttons you draw under one

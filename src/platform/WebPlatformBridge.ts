@@ -1,4 +1,4 @@
-import { DirectoryHandle, FileFilter, FileHandle, MenuChannel, PlatformBridge } from "./PlatformBridge";
+import { DirectoryHandle, FileFilter, FileHandle, MenuChannel, MinecraftWorld, PlatformBridge } from "./PlatformBridge";
 
 interface FileSystemWritableFileStreamLike {
   write(data: string | Blob): Promise<void>;
@@ -186,5 +186,22 @@ export class WebPlatformBridge implements PlatformBridge {
       };
       input.click();
     });
+  }
+
+  /** The browser cannot see a Minecraft install, so there is nothing to offer. */
+  public async listWorlds(): Promise<MinecraftWorld[]> {
+    return [];
+  }
+
+  public async writePath(): Promise<void> {
+    throw new Error("Writing to a path needs the desktop app.");
+  }
+
+  public async removePath(): Promise<void> {
+    throw new Error("Deleting a path needs the desktop app.");
+  }
+
+  public async readPath(): Promise<string | null> {
+    return null;
   }
 }

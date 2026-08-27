@@ -1,7 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from "electron";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, join } from "node:path";
-import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, stat, rm } from "node:fs/promises";
+import { homedir } from "node:os";
 import { DiscordRpcManager, DiscordActivityState } from "./DiscordRpcManager";
 import { AutoUpdaterManager } from "./AutoUpdaterManager";
 
@@ -122,6 +123,67 @@ class FileBridge {
       const s = await stat(path);
       return { size: s.size, mtimeMs: s.mtimeMs, isDir: s.isDirectory() };
     });
+    ipcMain.handle("fs:rm", async (_e, path: string) => {
+      await rm(path, { recursive: true, force: true });
+    });
+  }
+}
+
+/**
+ * Where the Minecraft installations of this machine keep their worlds.
+ *
+ * Bedrock on Windows stores them under the UWP package; the Linux and macOS
+ * ports both go through mcpelauncher, which mirrors the same `com.mojang` tree
+ * either in its own data directory or inside the Flatpak sandbox.
+ */
+function worldRoots(): string[] {
+  const home = homedir();
+  const tail = join("games", "com.mojang", "minecraftWorlds");
+  const roots: string[] = [];
+
+  if (process.platform === "win32") {
+    const local = process.env.LOCALAPPDATA ?? join(home, "AppData", "Local");
+    roots.push(join(local, "Packages", "Microsoft.MinecraftUWP_8wekyb3d8bbwe", "LocalState", tail));
+    roots.push(join(local, "Packages", "Microsoft.MinecraftWindowsBeta_8wekyb3d8bbwe", "LocalState", tail));
+  } else if (process.platform === "darwin") {
+    roots.push(join(home, "Library", "Application Support", "mcpelauncher", tail));
+  } else {
+    roots.push(join(home, ".var", "app", "io.mrarm.mcpelauncher", "data", "mcpelauncher", tail));
+    roots.push(join(home, ".local", "share", "mcpelauncher", tail));
+  }
+
+  return roots;
+}
+
+class WorldBridge {
+  public register(): void {
+    ipcMain.handle("worlds:list", async () => {
+      const worlds: Array<{ path: string; name: string; folder: string }> = [];
+
+      for (const root of worldRoots()) {
+        let entries;
+        try {
+          entries = await readdir(root, { withFileTypes: true });
+        } catch {
+          // The launcher is simply not installed on this machine.
+          continue;
+        }
+
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const path = join(root, entry.name);
+          let name = entry.name;
+          try {
+            name = (await readFile(join(path, "levelname.txt"), "utf-8")).trim() || entry.name;
+          } catch {
+            // A folder without a level name is still a world worth listing.
+          }
+          worlds.push({ path, name, folder: entry.name });
+        }
+      }
+
+      return worlds.sort((a, b) => a.name.localeCompare(b.name));
+    });
   }
 }
 
@@ -230,6 +292,7 @@ class JsonForgeApp {
   private readonly pending = new PendingOpenQueue();
   private readonly windowManager = new WindowManager(this.pending);
   private readonly fileBridge = new FileBridge();
+  private readonly worldBridge = new WorldBridge();
   private readonly dialogBridge = new DialogBridge();
   private readonly appMenu = new AppMenu();
   private readonly discordRpc = new DiscordRpcManager();
@@ -263,6 +326,7 @@ class JsonForgeApp {
       if (fromArgv) this.pending.enqueue(fromArgv);
 
       this.fileBridge.register();
+      this.worldBridge.register();
       this.dialogBridge.register(() => this.windowManager.get());
       this.discordBridge.register();
       ipcMain.handle("file:consumeOpenRequest", () => this.pending.consume());

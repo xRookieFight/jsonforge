@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Copy, Package } from "lucide-react";
+import { AlertTriangle, Check, Copy, Package, Play } from "lucide-react";
 import { ModalShell } from "./ModalShell";
 import { Container } from "../../core/di/Container";
 import { AddonExportService, AddonExportSettings } from "../../core/services/AddonExportService";
 import { ProjectService } from "../../core/services/ProjectService";
+import { WorldInstallService } from "../../core/services/WorldInstallService";
+import { MinecraftWorld } from "../../platform/PlatformBridge";
 import { generateScript } from "../../core/addon/ScriptGenerator";
 import { AddonBuildResult, toNamespace } from "../../core/addon/AddonTypes";
 import { collectFormButtons } from "../../core/addon/FormButtons";
@@ -30,6 +32,9 @@ export function ExportAddonModal({ open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AddonBuildResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [worlds, setWorlds] = useState<MinecraftWorld[]>([]);
+  const [world, setWorld] = useState("");
+  const [installed, setInstalled] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -37,6 +42,13 @@ export function ExportAddonModal({ open, onClose }: Props) {
     setSettings(service.defaults());
     setResult(null);
     setError(null);
+    setInstalled(null);
+
+    const installer = Container.resolve<WorldInstallService>(WorldInstallService.NAME);
+    void installer.listWorlds().then(found => {
+      setWorlds(found);
+      setWorld(current => (found.some(item => item.path === current) ? current : found[0]?.path ?? ""));
+    });
   }, [open]);
 
   const summary = useMemo(() => {
@@ -83,6 +95,28 @@ export function ExportAddonModal({ open, onClose }: Props) {
     try {
       const service = Container.resolve<AddonExportService>(AddonExportService.NAME);
       setResult(await service.exportToFile(settings));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBuilding(false);
+    }
+  };
+
+  const runInstall = async () => {
+    const target = worlds.find(item => item.path === world);
+    if (!target) return;
+
+    setBuilding(true);
+    setError(null);
+    setResult(null);
+    setInstalled(null);
+    try {
+      const service = Container.resolve<AddonExportService>(AddonExportService.NAME);
+      const built = await service.build(settings);
+      const installer = Container.resolve<WorldInstallService>(WorldInstallService.NAME);
+      const report = await installer.install(built, target);
+      setResult(built);
+      setInstalled(`${report.world.name} - ${report.packs.join(", ")}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -278,8 +312,39 @@ export function ExportAddonModal({ open, onClose }: Props) {
           </div>
         )}
 
+        {worlds.length > 0 && (
+          <div className="jf-form__row">
+            <label title="Writes the pack straight into the world instead of exporting a file to import by hand">
+              Test World
+            </label>
+            <select
+              className="jf-input jf-select"
+              value={world}
+              onChange={e => setWorld(e.target.value)}
+            >
+              {worlds.map(item => (
+                <option key={item.path} value={item.path}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {installed && (
+          <div className="jf-addon__summary">
+            <span>installed into <b>{installed}</b></span>
+          </div>
+        )}
+
         <div className="jf-form__actions">
           <button type="button" className="jf-btn" onClick={onClose}>Close</button>
+          {worlds.length > 0 && (
+            <button type="button" className="jf-btn" disabled={building || !world} onClick={runInstall}>
+              <Play size={13} strokeWidth={1.75} />
+              <span>{building ? "Building..." : "Install to World"}</span>
+            </button>
+          )}
           <button type="button" className="jf-btn jf-btn--primary" disabled={building} onClick={runExport}>
             <Package size={13} strokeWidth={1.75} />
             <span>{building ? "Building..." : scriptless ? "Export .mcpack" : "Export .mcaddon"}</span>

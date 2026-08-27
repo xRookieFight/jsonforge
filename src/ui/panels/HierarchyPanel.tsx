@@ -58,13 +58,23 @@ export function HierarchyPanel() {
 
   const target = menu ? root.findById(menu.nodeId) : null;
 
+  // Every container between the root and something selected, so the tree can
+  // show which panel the selection actually lives in.
+  const ancestors = new Set<string>();
+  for (const id of selection) {
+    const node = root.findById(id);
+    for (const step of node?.path() ?? []) {
+      if (step.id !== id) ancestors.add(step.id);
+    }
+  }
+
   return (
     <div className="jf-panel jf-hierarchy">
       <TreeRow
         node={root}
         parent={null}
-        depth={0}
         selection={selection}
+        ancestors={ancestors}
         onSelect={(id, mod) => (mod ? toggleSelect(id) : selectOnly(id))}
         onRename={renameElement}
         onMove={moveNode}
@@ -119,15 +129,16 @@ function MenuItem({ label, hint, onClick }: { label: string; hint?: string; onCl
 interface RowProps {
   node: ElementNode;
   parent: ElementNode | null;
-  depth: number;
   selection: string[];
+  /** Ids of the containers the selection sits inside. */
+  ancestors: Set<string>;
   onSelect(id: string, multi: boolean): void;
   onRename(id: string, name: string): void;
   onMove(id: string, newParentId: string, index: number): void;
   onContextMenu(e: React.MouseEvent, id: string): void;
 }
 
-function TreeRow({ node, parent, depth, selection, onSelect, onRename, onMove, onContextMenu }: RowProps) {
+function TreeRow({ node, parent, selection, ancestors, onSelect, onRename, onMove, onContextMenu }: RowProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(node.name);
@@ -152,10 +163,12 @@ function TreeRow({ node, parent, depth, selection, onSelect, onRename, onMove, o
   return (
     <div className="jf-tree">
       <div
-        className={"jf-tree__row" + (isSelected ? " jf-tree__row--selected" : "")}
+        className={
+          "jf-tree__row" +
+          (isSelected ? " jf-tree__row--selected" : "") +
+          (!isSelected && ancestors.has(node.id) ? " jf-tree__row--ancestor" : "")
+        }
         style={{
-          paddingLeft: 8 + depth * 14,
-          position: "relative",
           boxShadow:
             zone === "into" ? "inset 0 0 0 1px var(--jf-accent)" :
             zone === "before" ? "inset 0 2px 0 0 var(--jf-accent)" :
@@ -247,6 +260,7 @@ function TreeRow({ node, parent, depth, selection, onSelect, onRename, onMove, o
             {node.name}
           </span>
         )}
+        {hasChildren && <span className="jf-tree__count">{node.children.length}</span>}
         <span className="jf-tree__type">{meta?.label}</span>
       </div>
       {!collapsed && hasChildren && (
@@ -256,8 +270,8 @@ function TreeRow({ node, parent, depth, selection, onSelect, onRename, onMove, o
               key={child.id}
               node={child}
               parent={node}
-              depth={depth + 1}
               selection={selection}
+              ancestors={ancestors}
               onSelect={onSelect}
               onRename={onRename}
               onMove={onMove}

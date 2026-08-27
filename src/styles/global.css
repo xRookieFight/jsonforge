@@ -236,6 +236,33 @@ input, select, textarea { font: inherit; color: inherit; }
   cursor: pointer;
   user-select: none;
   border-radius: var(--jf-radius-sm);
+  position: relative;
+}
+
+/*
+ * Nesting is drawn, not just indented: a rail runs down the inside of every
+ * container, so a row can be traced back to the panel holding it instead of
+ * being counted in pixels.
+ */
+.jf-tree__children {
+  margin-left: 13px;
+  border-left: 1px solid var(--jf-border);
+}
+
+/* The container the selection lives in, marked all the way up to the root. */
+.jf-tree__row--ancestor { background: rgba(246, 196, 83, 0.06); }
+.jf-tree__row--ancestor > .jf-tree__label { color: var(--jf-text); }
+
+.jf-tree__children:has(.jf-tree__row--selected) { border-left-color: var(--jf-accent); }
+
+.jf-tree__count {
+  min-width: 15px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--jf-bg-2);
+  color: var(--jf-text-faint);
+  font-size: 10px;
+  text-align: center;
 }
 .jf-tree__row:hover { background: var(--jf-bg-2); }
 .jf-tree__row--selected { background: rgba(246, 196, 83, 0.18); color: var(--jf-text); }

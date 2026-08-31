@@ -22,7 +22,7 @@
     "@monaco-editor/react": "^4.6.0",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.8.9",
-    "immer": "^11.1.8",
+    "immer": "^11.1.18",
     "jszip": "^3.10.1",
     "lucide-react": "^1.17.0",
     "monaco-editor": "^0.55.1",

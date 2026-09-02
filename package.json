@@ -26,7 +26,7 @@
     "jszip": "^3.10.1",
     "lucide-react": "^1.17.0",
     "monaco-editor": "^0.55.1",
-    "nanoid": "^5.0.7",
+    "nanoid": "^6.0.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-mosaic-component": "^7.0.0",
